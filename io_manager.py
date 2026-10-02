@@ -135,7 +135,6 @@ def collect_request(request_id, club_names):
 
     return request
 
-
 # ============================================================
 # NEW: Functions for viewing a club budget by year.
 # ============================================================
@@ -180,11 +179,27 @@ def show_result(record):
     print(f"Request ID: {record['request_id']}")
     print(f"Club: {record['club_name']}")
     print(f"Event: {record['event_title']}")
+    print(f"Funding year: {assessment['funding_year']}")
+
+    print("\nAnnual budget:")
+    print(f"Allocated: ${assessment['annual_budget']:.2f}")
+    print(f"Previously committed: ${assessment['used_budget_before']:.2f}")
+    print(f"Available before request: ${assessment['remaining_budget_before']:.2f}")
 
     print("\nCurrent request:")
     print(f"Requested: ${assessment['total_requested']:.2f}")
     print(f"Estimated eligible: ${assessment['estimated_eligible_amount']:.2f}")
     print(f"Status: {assessment['status']}")
+
+    if record.get("budget_committed"):
+        print(f"Budget deducted/reserved: ${record['budget_amount']:.2f}")
+        print(f"Budget remaining: ${assessment['remaining_budget_after']:.2f}")
+    else:
+        print("Budget deducted/reserved: $0.00")
+        print(
+            "Budget remaining: "
+            f"${assessment['remaining_budget_before']:.2f}"
+        )
 
     print("\nChecks:")
     for check in assessment["checks"]:
