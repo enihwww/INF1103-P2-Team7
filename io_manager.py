@@ -228,10 +228,12 @@ def show_requests(records, title="Requests"):
             record.get("processing_status", "UNKNOWN")
         )
         total = assessment.get("total_requested", 0)
+        year = record.get("funding_year", "-")
 
         print(
             f"{record['request_id']} | "
             f"{record['club_name']} | "
+            f"{year} | "
             f"${total:.2f} | "
             f"{status}"
         )
@@ -247,3 +249,4 @@ def show_summary(summary):
     print(f"AI failed: {summary['ai_failed']}")
     print(f"Total requested: ${summary['total_requested']:.2f}")
     print(f"Estimated eligible: ${summary['estimated_eligible']:.2f}")
+    print(f"Budget committed: ${summary['budget_committed']:.2f}")
