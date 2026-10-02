@@ -8,3 +8,5 @@ def calculate_total(expenses):
 def calculate_lead_days(submission_date, event_date):
     submitted = date.fromisoformat(submission_date)
     event = date.fromisoformat(event_date)
+
+    return (event - submitted).days
