@@ -136,6 +136,38 @@ def collect_request(request_id, club_names):
     return request
 
 
+# ============================================================
+# NEW: Functions for viewing a club budget by year.
+# ============================================================
+def choose_budget_club(club_names):
+    #Choose a club whose annual budget should be displayed.
+    return select_club(club_names)
+
+
+def get_year():
+    #Get a four-digit funding year.
+    while True:
+        year = input("Funding year (e.g. 2026): ").strip()
+
+        if year.isdigit() and len(year) == 4:
+            return int(year)
+
+        print("Enter a valid four-digit year.")
+
+
+def show_message(message):
+    #Display a normal message or warning.
+    print(message)
+
+
+def show_budget(budget_info, club_name, year):
+    #Display one club's annual budget position.
+    print(f"\n=== {club_name} - {year} BUDGET ===")
+    print(f"Annual budget: ${budget_info['annual_budget']:.2f}")
+    print(f"Used/committed: ${budget_info['used_budget']:.2f}")
+    print(f"Remaining: ${budget_info['remaining_budget']:.2f}")
+
+
 def show_result(record):
     #Display the final funding assessment.
     assessment = record.get("assessment")
