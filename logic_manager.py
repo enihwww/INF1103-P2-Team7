@@ -10,3 +10,10 @@ def calculate_lead_days(submission_date, event_date):
     event = date.fromisoformat(event_date)
 
     return (event - submitted).days
+
+#store one PASS, FAIL or REVIEW message
+def add_check(checks, result, message):
+    checks.append({
+        "result": result,
+        "message": message
+    })
