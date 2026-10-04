@@ -76,9 +76,6 @@ def load_policy():
     except (OSError, json.JSONDecodeError) as error:
         return None, f"Could not load policy: {error}"
 
-# ============================================================
-# NEW: Load and validate each club's fixed annual allocation.
-# ============================================================
 def load_club_budgets():
     """Load the fixed annual allocation for each club."""
     try:
@@ -102,3 +99,23 @@ def load_club_budgets():
 
     except (OSError, json.JSONDecodeError) as error:
         return None, f"Could not load club budgets: {error}"
+
+# Return club names
+def get_club_names(budgets):
+    """Return club names in alphabetical order."""
+    return sorted(budgets.keys())
+
+def next_request_id(records):
+    """Generate CF0001, CF0002, CF0003, etc."""
+    highest_number = 0
+
+    for record in records:
+        request_id = record.get("request_id", "")
+
+        if request_id.startswith("CF") and request_id[2:].isdigit():
+            highest_number = max(
+                highest_number,
+                int(request_id[2:])
+            )
+
+    return f"CF{highest_number + 1:04d}"
