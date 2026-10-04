@@ -25,3 +25,26 @@ def load_requests():
 
     except (OSError, json.JSONDecodeError) as error:
         return [], f"Could not load requests: {error}"
+
+def save_requests(records):
+    """Save all request records to JSON."""
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+
+        with open(REQUESTS_FILE, "w", encoding="utf-8") as file:
+            json.dump(records, file, indent=2)
+
+        return True, None
+
+    except OSError as error:
+        return False, f"Could not save requests: {error}"
+
+def add_request(records, record):
+    """Add one record and save the updated list."""
+    records.append(record)
+    success, error = save_requests(records)
+
+    if not success:
+        records.pop()
+
+    return success, error
