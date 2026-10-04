@@ -204,3 +204,211 @@ def make_record(request,ai_result,assessment,processing_status,error=None):
         record["budget_amount"] = 0.0
 
     return record
+
+# Exporting to excel
+def export_to_excel(records, budgets):
+    """Create an Excel report from the JSON records.
+    Excel is a reporting layer only.
+    requests.json remains the main project storage.
+    """
+    try:
+        import xlsxwriter
+    except ImportError:
+        return False, "XlsxWriter is not installed."
+
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        workbook = xlsxwriter.Workbook(EXCEL_FILE)
+        title_format = workbook.add_format({"bold": True,"font_size": 16})
+        header_format = workbook.add_format({"bold": True,"border": 1})
+        money_format = workbook.add_format({"num_format": "$#,##0.00"})
+        percent_format = workbook.add_format({"num_format": "0%"})
+
+        # ---------------- Dashboard ----------------
+        dashboard = workbook.add_worksheet("Dashboard")
+        summary = build_summary(records)
+
+        dashboard.write("A1", "ClubFund Dashboard", title_format)
+        dashboard.write("A3", "Total Requests")
+        dashboard.write("B3", summary["total_requests"])
+        dashboard.write("A4", "Ready for Review")
+        dashboard.write("B4", summary["ready_for_review"])
+        dashboard.write("A5", "Revision Required")
+        dashboard.write("B5", summary["revision_required"])
+        dashboard.write("A6", "Manual Review")
+        dashboard.write("B6", summary["manual_review"])
+        dashboard.write("A8", "Total Requested")
+        dashboard.write("B8", summary["total_requested"], money_format)
+        dashboard.write("A9", "Estimated Eligible")
+        dashboard.write("B9", summary["estimated_eligible"], money_format)
+        dashboard.write("A10", "Budget Committed")
+        dashboard.write("B10", summary["budget_committed"], money_format)
+
+        dashboard.set_column("A:A", 24)
+        dashboard.set_column("B:B", 18)
+
+        # ---------------- Requests ----------------
+        requests_sheet = workbook.add_worksheet("Requests")
+
+        request_headers = [
+            "Request ID",
+            "Club",
+            "Funding Year",
+            "Event",
+            "Event Date",
+            "Participants",
+            "Requested",
+            "Estimated Eligible",
+            "Status",
+            "Budget Committed"
+        ]
+
+        for column, header in enumerate(request_headers):
+            requests_sheet.write(0, column, header, header_format)
+
+        for row, record in enumerate(records, start=1):
+            assessment = record.get("assessment") or {}
+
+            values = [
+                record.get("request_id", ""),
+                record.get("club_name", ""),
+                record.get("funding_year", ""),
+                record.get("event_title", ""),
+                record.get("event_date", ""),
+                record.get("expected_participants", 0),
+                assessment.get("total_requested", 0),
+                assessment.get("estimated_eligible_amount", 0),
+                assessment.get("status", record.get("processing_status", "")),
+                record.get("budget_amount", 0)
+            ]
+
+            for column, value in enumerate(values):
+                if column in (6, 7, 9):
+                    requests_sheet.write(row, column, value, money_format)
+                else:
+                    requests_sheet.write(row, column, value)
+
+        requests_sheet.set_column("A:A", 12)
+        requests_sheet.set_column("B:B", 22)
+        requests_sheet.set_column("C:C", 12)
+        requests_sheet.set_column("D:D", 28)
+        requests_sheet.set_column("E:E", 14)
+        requests_sheet.set_column("F:F", 12)
+        requests_sheet.set_column("G:J", 20)
+
+        # Expenses
+        expenses_sheet = workbook.add_worksheet("Expenses")
+
+        expense_headers = [
+            "Request ID",
+            "Club",
+            "Year",
+            "Expense ID",
+            "Description",
+            "AI Category",
+            "Amount",
+            "Quote Available"
+        ]
+
+        for column, header in enumerate(expense_headers):
+            expenses_sheet.write(0, column, header, header_format)
+
+        expense_row = 1
+
+        for record in records:
+            ai_result = record.get("ai_result") or {}
+
+            ai_expenses = {
+                item["expense_id"]: item
+                for item in ai_result.get("expenses", [])
+                if "expense_id" in item
+            }
+
+            for expense in record.get("expenses", []):
+                ai_expense = ai_expenses.get(expense["expense_id"], {})
+
+                values = [
+                    record.get("request_id", ""),
+                    record.get("club_name", ""),
+                    record.get("funding_year", ""),
+                    expense.get("expense_id", ""),
+                    expense.get("description", ""),
+                    ai_expense.get("category", ""),
+                    expense.get("amount", 0),
+                    "Yes" if expense.get("quote_available") else "No"
+                ]
+
+                for column, value in enumerate(values):
+                    if column == 6:
+                        expenses_sheet.write(expense_row,column,value,money_format)
+                    else:
+                        expenses_sheet.write(expense_row, column, value)
+
+                expense_row += 1
+
+        expenses_sheet.set_column("A:D", 14)
+        expenses_sheet.set_column("E:E", 35)
+        expenses_sheet.set_column("F:F", 22)
+        expenses_sheet.set_column("G:G", 14)
+        expenses_sheet.set_column("H:H", 16)
+
+        # Annual Budgets
+        budget_sheet = workbook.add_worksheet("Annual Budgets")
+
+        budget_headers = [
+            "Club",
+            "Year",
+            "Annual Budget",
+            "Used / Committed",
+            "Remaining",
+            "% Used"
+        ]
+
+        for column, header in enumerate(budget_headers):
+            budget_sheet.write(0, column, header, header_format)
+
+        years = sorted({record.get("funding_year")
+            for record in records
+            if record.get("funding_year") is not None
+        })
+
+        budget_row = 1
+
+        for year in years:
+            for club in get_club_names(budgets):
+                info = get_budget_info(records,budgets,club,year)
+                percent_used = 0
+
+                if info["annual_budget"] > 0:
+                    percent_used = (
+                        info["used_budget"]
+                        / info["annual_budget"]
+                    )
+
+                budget_sheet.write(budget_row, 0, club)
+                budget_sheet.write(budget_row, 1, year)
+                budget_sheet.write(
+                    budget_row, 2, info["annual_budget"], money_format
+                )
+                budget_sheet.write(
+                    budget_row, 3, info["used_budget"], money_format
+                )
+                budget_sheet.write(
+                    budget_row, 4, info["remaining_budget"], money_format
+                )
+                budget_sheet.write(
+                    budget_row, 5, percent_used, percent_format
+                )
+
+                budget_row += 1
+
+        budget_sheet.set_column("A:A", 24)
+        budget_sheet.set_column("B:B", 10)
+        budget_sheet.set_column("C:E", 18)
+        budget_sheet.set_column("F:F", 12)
+        workbook.close()
+
+        return True, f"Excel report created: {EXCEL_FILE}"
+
+    except Exception as error:
+        return False, f"Could not create Excel report: {error}"
