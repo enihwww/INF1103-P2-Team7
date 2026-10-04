@@ -48,3 +48,57 @@ def add_request(records, record):
         records.pop()
 
     return success, error
+
+def load_policy():
+    """Load and lightly validate the funding policy."""
+    try:
+        with open(POLICY_FILE, "r", encoding="utf-8") as file:
+            policy = json.load(file)
+
+        required_fields = [
+            "max_request_amount",
+            "minimum_lead_days",
+            "food_per_person_limit",
+            "max_prize_amount",
+            "equipment_quote_threshold",
+            "ineligible_categories"
+        ]
+
+        for field in required_fields:
+            if field not in policy:
+                return None, f"Policy is missing: {field}"
+
+        return policy, None
+
+    except FileNotFoundError:
+        return None, "policy.json was not found."
+
+    except (OSError, json.JSONDecodeError) as error:
+        return None, f"Could not load policy: {error}"
+
+# ============================================================
+# NEW: Load and validate each club's fixed annual allocation.
+# ============================================================
+def load_club_budgets():
+    """Load the fixed annual allocation for each club."""
+    try:
+        with open(BUDGETS_FILE, "r", encoding="utf-8") as file:
+            budgets = json.load(file)
+
+        if not isinstance(budgets, dict) or not budgets:
+            return None, "club_budgets.json must contain club budgets."
+
+        for club, amount in budgets.items():
+            if not isinstance(club, str):
+                return None, "Club names in club_budgets.json must be text."
+
+            if not isinstance(amount, (int, float)) or amount < 0:
+                return None, f"Invalid annual budget for {club}."
+
+        return budgets, None
+
+    except FileNotFoundError:
+        return None, "club_budgets.json was not found."
+
+    except (OSError, json.JSONDecodeError) as error:
+        return None, f"Could not load club budgets: {error}"
