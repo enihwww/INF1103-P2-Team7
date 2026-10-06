@@ -67,7 +67,6 @@ def build_prompt(request):
     }
 
     return json.dumps(ai_input, indent=2)
-<<<<<<< HEAD
 
 
 def validate_result(result, request):
@@ -148,5 +147,3 @@ def analyse_request(request):
             last_error = str(error)
 
     return None, (f"AI processing failed after {MAX_ATTEMPTS} attempts: "f"{last_error}")
-=======
->>>>>>> 7d027bead25122400627720a575bcce5356076dc
