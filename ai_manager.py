@@ -29,10 +29,7 @@ VALID_CATEGORIES = {
 
 AI_INSTRUCTIONS = """
 You classify student club funding requests.
-
-Do not approve or reject funding.
-Do not apply funding limits.
-Only interpret the event and expense descriptions.
+Do not approve or reject funding. Do not apply funding limits. Only interpret the event and expense descriptions.
 
 Return ONLY valid JSON in this format:
 
@@ -55,15 +52,16 @@ Never invent expense IDs.
 If an expense is unclear, use "unknown" and set "ambiguous" to true.
 """.strip()
 
-
+#Create the record that is sent to the AI.
 def build_prompt(request):
-    """Creates record to send to the AI."""
     ai_input = {
         "event_title": request["event_title"],
         "event_description": request["event_description"],
         "expected_participants": request["expected_participants"],
         "expenses": [
-            {"expense_id": expense["expense_id"],"description": expense["description"],"amount": expense["amount"]}
+            {"expense_id": expense["expense_id"],"description": expense["description"],
+            "amount": expense["amount"]
+            }
             for expense in request["expenses"]
         ]
     }
@@ -72,16 +70,11 @@ def build_prompt(request):
 
 
 def validate_result(result, request):
-    """Checks if AI returned the correct JSON structure."""
+    #Check that the AI returned the JSON structure we expect.
     if not isinstance(result, dict):
         return False, "AI response is not a JSON object."
 
-    required_fields = [
-        "event_type",
-        "event_purpose",
-        "expenses",
-        "missing_information"
-    ]
+    required_fields = ["event_type", "event_purpose", "expenses","missing_information"]
 
     for field in required_fields:
         if field not in result:
@@ -99,10 +92,7 @@ def validate_result(result, request):
     if not isinstance(result["missing_information"], list):
         return False, "missing_information must be a list."
 
-    expected_ids = {
-        expense["expense_id"]
-        for expense in request["expenses"]
-    }
+    expected_ids = {expense["expense_id"] for expense in request["expenses"]}
 
     returned_ids = set()
 
@@ -131,30 +121,20 @@ def validate_result(result, request):
     if returned_ids != expected_ids:
         return False, "AI expense IDs do not match the submitted expenses."
 
-    if not all(
-        isinstance(item, str)
-        for item in result["missing_information"]
-    ):
+    if not all(isinstance(item, str)for item in result["missing_information"]):
         return False, "missing_information must contain text only."
 
     return True, ""
 
-
+#Send a funding request to the AI and return validated JSON.
 def analyse_request(request):
-    """Send a funding request to the AI and return validated JSON."""
     prompt = build_prompt(request)
     last_error = "Unknown AI error."
 
     for _ in range(MAX_ATTEMPTS):
         try:
             client = OpenAI()
-
-            response = client.responses.create(
-                model=MODEL,
-                instructions=AI_INSTRUCTIONS,
-                input=prompt
-            )
-
+            response = client.responses.create(model=MODEL,instructions=AI_INSTRUCTIONS,input=prompt)
             result = json.loads(response.output_text)
             valid, error = validate_result(result, request)
 
@@ -166,7 +146,4 @@ def analyse_request(request):
         except Exception as error:
             last_error = str(error)
 
-    return None, (
-        f"AI processing failed after {MAX_ATTEMPTS} attempts: "
-        f"{last_error}"
-    )
+    return None, (f"AI processing failed after {MAX_ATTEMPTS} attempts: "f"{last_error}")

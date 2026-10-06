@@ -23,7 +23,6 @@ def process_new_request(records, policy, budgets, club_names):
     request["funding_year"] = int(request["event_date"][:4])
 
     # Calculate the club's annual budget from saved history.
-    # The user no longer enters a remaining budget manually.
     budget_info = data_manager.get_budget_info(records,budgets,request["club_name"],request["funding_year"])
     ai_result, ai_error = ai_manager.analyse_request(request)
 
