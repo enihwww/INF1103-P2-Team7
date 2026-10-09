@@ -1,36 +1,73 @@
 from datetime import date
 
-def show_menu():
-    #Display the main command-line menu.
-    print("\n=== CLUBFUND ===")
-    print("1. New funding request")
-    print("2. View all requests")
-    print("3. View club annual budget")
-    print("4. View summary")
-    print("5. Export Excel report")
-    print("6. Exit")
 
-def get_choice():
-    #Get a valid menu choice from 1 to 6.
+def get_user_role():
+    # Display the login role selection menu.
+    print("\n=== LOG IN ===")
+    print("1. Student")
+    print("2. Admin")
+
     while True:
-        choice = input("Choose 1-6: ").strip()
-        if choice.isdigit() and 1 <= int(choice) <= 6:
+        choice = input("Choose 1-2: ").strip()
+
+        if choice == "1":
+            return "student"
+
+        if choice == "2":
+            return "admin"
+
+        print("Invalid choice. Enter 1 or 2.")
+
+
+def show_menu(role):
+    # Display the main command-line menu.
+    print("\n=== CLUBFUND ===")
+
+    if role == "student":
+        print("1. New funding request")
+        print("2. View all requests")
+        print("6. Exit")
+    else:
+        print("1. New funding request")
+        print("2. View all requests")
+        print("3. View club annual budget")
+        print("4. View summary")
+        print("5. Export Excel report")
+        print("6. Exit")
+
+
+def get_choice(role):
+    # Get a valid menu choice based on the user's role.
+    while True:
+        if role == "student":
+            choice = input("Choose 1, 2, or 6: ").strip()
+            valid_choices = [1, 2, 6]
+        else:
+            choice = input("Choose 1-6: ").strip()
+            valid_choices = [1, 2, 3, 4, 5, 6]
+
+        if choice.isdigit() and int(choice) in valid_choices:
             return int(choice)
 
-        print("Invalid choice. Enter a number from 1 to 6.")
+        if role == "student":
+            print("Invalid choice. Enter 1, 2, or 6.")
+        else:
+            print("Invalid choice. Enter a number from 1 to 6.")
 
 
 def get_text(prompt):
-    #Get text that cannot be empty.
+    # Get text that cannot be empty.
     while True:
         value = input(prompt).strip()
+
         if value:
             return value
 
         print("Input cannot be empty.")
 
+
 def get_positive_int(prompt):
-    #Get a whole number greater than 0
+    # Get a whole number greater than 0.
     while True:
         value = input(prompt).strip()
 
@@ -39,8 +76,9 @@ def get_positive_int(prompt):
 
         print("Enter a whole number greater than 0.")
 
+
 def get_money(prompt):
-    #Get a money value of 0 or more
+    # Get a money value of 0 or more.
     while True:
         try:
             value = float(input(prompt).strip())
@@ -53,10 +91,14 @@ def get_money(prompt):
 
         print("Enter a valid amount, e.g. 250 or 250.50.")
 
+
 def get_yes_no(prompt):
-    #Return True for yes and False for no.
+    # Return True for yes and False for no.
     while True:
-        answer = input(f"{prompt} (y/n): ").strip().lower()
+        answer = input(
+            f"{prompt} (y/n): "
+        ).strip().lower()
+
         if answer in ("y", "yes"):
             return True
 
@@ -65,10 +107,13 @@ def get_yes_no(prompt):
 
         print("Enter y or n.")
 
+
 def get_date(prompt):
-    #Get a valid date in YYYY-MM-DD format.
+    # Get a valid date in YYYY-MM-DD format.
     while True:
-        value = input(f"{prompt} (YYYY-MM-DD): ").strip()
+        value = input(
+            f"{prompt} (YYYY-MM-DD): "
+        ).strip()
 
         try:
             date.fromisoformat(value)
@@ -77,12 +122,9 @@ def get_date(prompt):
         except ValueError:
             print("Invalid date. Example: 2026-10-15.")
 
-# ============================================================
-# NEW: Clubs are selected from club_budgets.json instead of typed freely.
-# This prevents spelling variations from creating duplicate club names.
-# ============================================================
+
 def select_club(club_names):
-    #Let the user choose from clubs that have an annual budget.
+    # Let the user choose from registered clubs.
     print("\nAvailable clubs:")
 
     for number, club in enumerate(club_names, start=1):
@@ -99,15 +141,9 @@ def select_club(club_names):
 
         print("Invalid club selection.")
 
-# ============================================================
-# CHANGED: collect_request() now receives club_names.
-# REMOVED: user-entered remaining_budget.
-# The remaining annual budget is calculated by data_manager.py.
-# ============================================================
+
 def collect_request(request_id, club_names):
-    #Collect one complete funding request.
-    #The user no longer enters a remaining budget.
-    #The Data Manager calculates it from previous saved requests.
+    # Collect one complete funding request.
     print("\n--- New Funding Request ---")
 
     request = {
@@ -117,11 +153,15 @@ def collect_request(request_id, club_names):
         "event_description": get_text("Describe the event: "),
         "event_date": get_date("Event date"),
         "submission_date": get_date("Submission date"),
-        "expected_participants": get_positive_int("Expected participants: "),
+        "expected_participants": get_positive_int(
+            "Expected participants: "
+        ),
         "expenses": []
     }
 
-    number_of_expenses = get_positive_int("Number of expense items: ")
+    number_of_expenses = get_positive_int(
+        "Number of expense items: "
+    )
 
     for number in range(1, number_of_expenses + 1):
         print(f"\nExpense {number}")
@@ -130,21 +170,21 @@ def collect_request(request_id, club_names):
             "expense_id": f"E{number}",
             "description": get_text("Description: "),
             "amount": get_money("Amount ($): "),
-            "quote_available": get_yes_no("Supplier quote available?")
+            "quote_available": get_yes_no(
+                "Supplier quote available?"
+            )
         })
 
     return request
 
-# ============================================================
-# NEW: Functions for viewing a club budget by year.
-# ============================================================
+
 def choose_budget_club(club_names):
-    #Choose a club whose annual budget should be displayed.
+    # Choose a club whose annual budget should be displayed.
     return select_club(club_names)
 
 
 def get_year():
-    #Get a four-digit funding year.
+    # Get a four-digit funding year.
     while True:
         year = input("Funding year (e.g. 2026): ").strip()
 
@@ -155,12 +195,12 @@ def get_year():
 
 
 def show_message(message):
-    #Display a normal message or warning.
+    # Display a normal message or warning.
     print(message)
 
 
 def show_budget(budget_info, club_name, year):
-    #Display one club's annual budget position.
+    # Display one club's annual budget position.
     print(f"\n=== {club_name} - {year} BUDGET ===")
     print(f"Annual budget: ${budget_info['annual_budget']:.2f}")
     print(f"Used/committed: ${budget_info['used_budget']:.2f}")
@@ -168,7 +208,7 @@ def show_budget(budget_info, club_name, year):
 
 
 def show_result(record):
-    #Display the final funding assessment.
+    # Display the final funding assessment.
     assessment = record.get("assessment")
 
     if not assessment:
@@ -181,40 +221,76 @@ def show_result(record):
     print(f"Event: {record['event_title']}")
     print(f"Funding year: {assessment['funding_year']}")
 
+    # Make AI failures obvious without losing the parsed/calculated values.
+    if record.get("processing_status") == "AI_FAILED":
+        print("\nAI status: UNAVAILABLE")
+        print(
+            "AI-dependent categories were not classified. "
+            "This request requires manual review."
+        )
+
     print("\nAnnual budget:")
     print(f"Allocated: ${assessment['annual_budget']:.2f}")
-    print(f"Previously committed: ${assessment['used_budget_before']:.2f}")
-    print(f"Available before request: ${assessment['remaining_budget_before']:.2f}")
+    print(
+        f"Previously committed: "
+        f"${assessment['used_budget_before']:.2f}"
+    )
+    print(
+        f"Available before request: "
+        f"${assessment['remaining_budget_before']:.2f}"
+    )
 
     print("\nCurrent request:")
     print(f"Requested: ${assessment['total_requested']:.2f}")
-    print(f"Estimated eligible: ${assessment['estimated_eligible_amount']:.2f}")
+
+    if record.get("processing_status") == "AI_FAILED":
+        print(
+            f"Provisional eligible amount: "
+            f"${assessment['estimated_eligible_amount']:.2f}"
+        )
+    else:
+        print(
+            f"Estimated eligible: "
+            f"${assessment['estimated_eligible_amount']:.2f}"
+        )
+
     print(f"Status: {assessment['status']}")
 
     if record.get("budget_committed"):
-        print(f"Budget deducted/reserved: ${record['budget_amount']:.2f}")
-        print(f"Budget remaining: ${assessment['remaining_budget_after']:.2f}")
+        print(
+            f"Budget deducted/reserved: "
+            f"${record['budget_amount']:.2f}"
+        )
+        print(
+            f"Budget remaining: "
+            f"${assessment['remaining_budget_after']:.2f}"
+        )
     else:
         print("Budget deducted/reserved: $0.00")
         print(
-            "Budget remaining: "
+            f"Budget remaining: "
             f"${assessment['remaining_budget_before']:.2f}"
         )
 
     print("\nChecks:")
+
     for check in assessment["checks"]:
         print(f"- {check['result']}: {check['message']}")
 
     if assessment["issues"]:
         print("\nIssues:")
+
         for issue in assessment["issues"]:
             print(f"- {issue}")
 
-    print("\nThis is a pre-screening result, not final funding approval.")
+    print(
+        "\nThis is a pre-screening result, "
+        "not final funding approval."
+    )
 
 
 def show_requests(records, title="Requests"):
-    #Display a short list of saved requests.
+    # Display a short list of saved requests.
     print(f"\n=== {title} ===")
 
     if not records:
@@ -223,24 +299,28 @@ def show_requests(records, title="Requests"):
 
     for record in records:
         assessment = record.get("assessment") or {}
+
         status = assessment.get(
             "status",
             record.get("processing_status", "UNKNOWN")
         )
+
         total = assessment.get("total_requested", 0)
         year = record.get("funding_year", "-")
+        processing_status = record.get("processing_status", "")
 
         print(
             f"{record['request_id']} | "
             f"{record['club_name']} | "
             f"{year} | "
             f"${total:.2f} | "
-            f"{status}"
+            f"{status} | "
+            f"{processing_status}"
         )
 
 
 def show_summary(summary):
-    #Display summary statistics.
+    # Display summary statistics.
     print("\n=== SUMMARY ===")
     print(f"Total requests: {summary['total_requests']}")
     print(f"Ready for review: {summary['ready_for_review']}")
