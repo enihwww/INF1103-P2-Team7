@@ -10,7 +10,7 @@ BUDGETS_FILE = os.path.join(DATA_DIR, "club_budgets.json")
 EXCEL_FILE = os.path.join(DATA_DIR, "ClubFund_Report.xlsx")
 
 def load_requests():
-    """Load saved requests. A missing file means no requests yet."""
+    """Load saved requests."""
     if not os.path.exists(REQUESTS_FILE):
         return [], None
 
@@ -50,7 +50,7 @@ def add_request(records, record):
     return success, error
 
 def load_policy():
-    """Load and lightly validate the funding policy."""
+    """Load and validate the funding policy."""
     try:
         with open(POLICY_FILE, "r", encoding="utf-8") as file:
             policy = json.load(file)
@@ -61,7 +61,7 @@ def load_policy():
             "food_per_person_limit",
             "max_prize_amount",
             "equipment_quote_threshold",
-            "ineligible_categories"
+            "ineligible_categories",
         ]
 
         for field in required_fields:
@@ -113,19 +113,13 @@ def next_request_id(records):
         request_id = record.get("request_id", "")
 
         if request_id.startswith("CF") and request_id[2:].isdigit():
-            highest_number = max(
-                highest_number,
-                int(request_id[2:])
-            )
+            highest_number = max(highest_number, int(request_id[2:]))
 
     return f"CF{highest_number + 1:04d}"
 
 def get_used_budget(records, club_name, year):
-    """Calculate how much annual budget has already been committed.
+    """Calculate annual budget already committed."""
 
-    Only requests marked budget_committed=True are counted.
-    Requests from other years do not affect this year's budget.
-    """
     total = 0.0
 
     for record in records:
@@ -138,16 +132,20 @@ def get_used_budget(records, club_name, year):
 
     return round(total, 2)
 
-# Calculate annual budget, amount already used and amount remaining.
-def get_budget_info(records, budgets, club_name, year):
-    """Return annual, used and remaining budget for one club and year."""
-    annual_budget = float(budgets[club_name])
-    used_budget = get_used_budget(records,club_name,year)
-    remaining_budget = max(annual_budget - used_budget,0)
 
-    return {"annual_budget": round(annual_budget, 2),
+def get_budget_info(records, budgets, club_name, year):
+    """Return annual, used and remaining budget."""
+
+    annual_budget = float(budgets[club_name])
+    used_budget = get_used_budget(records, club_name, year)
+    remaining_budget = max(annual_budget - used_budget, 0)
+
+    return {
+        "annual_budget": round(annual_budget, 2),
         "used_budget": round(used_budget, 2),
-        "remaining_budget": round(remaining_budget, 2)}
+        "remaining_budget": round(remaining_budget, 2),
+    }
+
 
 def build_summary(records):
     """Calculate statistics for the summary menu."""
@@ -159,7 +157,7 @@ def build_summary(records):
         "ai_failed": 0,
         "total_requested": 0.0,
         "estimated_eligible": 0.0,
-        "budget_committed": 0.0
+        "budget_committed": 0.0,
     }
 
     for record in records:
@@ -177,17 +175,21 @@ def build_summary(records):
         if record.get("processing_status") == "AI_FAILED":
             summary["ai_failed"] += 1
 
-        summary["total_requested"] += assessment.get("total_requested",0)
-        summary["estimated_eligible"] += assessment.get("estimated_eligible_amount",0)
-        summary["budget_committed"] += record.get("budget_amount",0)
+        # AI-failed records now still have an assessment,
+        # so their deterministic values are included here.
+        summary["total_requested"] += assessment.get("total_requested", 0)
 
-    for field in ["total_requested","estimated_eligible","budget_committed"]:
+        summary["estimated_eligible"] += assessment.get("estimated_eligible_amount", 0)
+
+        summary["budget_committed"] += record.get("budget_amount", 0)
+
+    for field in ["total_requested", "estimated_eligible", "budget_committed"]:
         summary[field] = round(summary[field], 2)
 
     return summary
 
 
-def make_record(request,ai_result,assessment,processing_status,error=None):
+def make_record(request, ai_result, assessment, processing_status, error=None):
     """Combine input, AI output and assessment for saving."""
     record = request.copy()
     record["ai_result"] = ai_result
@@ -195,8 +197,13 @@ def make_record(request,ai_result,assessment,processing_status,error=None):
     record["processing_status"] = processing_status
     record["processing_error"] = error
 
-    # READY_FOR_REVIEW automatically reserves the eligible amount.
-    if assessment and assessment["status"] == "READY_FOR_REVIEW":
+    # A failed API request produces MANUAL_REVIEW,
+    # so it will never reserve annual budget.
+    if (
+        assessment
+        and assessment["status"] == "READY_FOR_REVIEW"
+        and processing_status == "PROCESSED"
+    ):
         record["budget_committed"] = True
         record["budget_amount"] = assessment["budget_to_commit"]
     else:
@@ -205,29 +212,27 @@ def make_record(request,ai_result,assessment,processing_status,error=None):
 
     return record
 
-# Exporting to excel
+
+# Exporting to Excel.
 def export_to_excel(records, budgets):
-    """Create an Excel report from the JSON records.
-    Excel is a reporting layer only.
-    requests.json remains the main project storage.
-    """
+    """Create an Excel report from the JSON records."""
+
     try:
         import xlsxwriter
     except ImportError:
-        return False, "XlsxWriter is not installed."
+        return False, ("XlsxWriter is not installed.")
 
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
         workbook = xlsxwriter.Workbook(EXCEL_FILE)
-        title_format = workbook.add_format({"bold": True,"font_size": 16})
-        header_format = workbook.add_format({"bold": True,"border": 1})
+        title_format = workbook.add_format({"bold": True, "font_size": 16})
+        header_format = workbook.add_format({"bold": True, "border": 1})
         money_format = workbook.add_format({"num_format": "$#,##0.00"})
         percent_format = workbook.add_format({"num_format": "0%"})
 
-        # ---------------- Dashboard ----------------
+        # Dashboard
         dashboard = workbook.add_worksheet("Dashboard")
         summary = build_summary(records)
-
         dashboard.write("A1", "ClubFund Dashboard", title_format)
         dashboard.write("A3", "Total Requests")
         dashboard.write("B3", summary["total_requests"])
@@ -237,17 +242,18 @@ def export_to_excel(records, budgets):
         dashboard.write("B5", summary["revision_required"])
         dashboard.write("A6", "Manual Review")
         dashboard.write("B6", summary["manual_review"])
-        dashboard.write("A8", "Total Requested")
-        dashboard.write("B8", summary["total_requested"], money_format)
-        dashboard.write("A9", "Estimated Eligible")
-        dashboard.write("B9", summary["estimated_eligible"], money_format)
-        dashboard.write("A10", "Budget Committed")
-        dashboard.write("B10", summary["budget_committed"], money_format)
-
-        dashboard.set_column("A:A", 24)
+        dashboard.write("A7", "AI Failed")
+        dashboard.write("B7", summary["ai_failed"])
+        dashboard.write("A9", "Total Requested")
+        dashboard.write("B9", summary["total_requested"], money_format)
+        dashboard.write("A10", "Estimated / Provisional Eligible")
+        dashboard.write("B10", summary["estimated_eligible"], money_format)
+        dashboard.write("A11", "Budget Committed")
+        dashboard.write("B11", summary["budget_committed"], money_format)
+        dashboard.set_column("A:A", 32)
         dashboard.set_column("B:B", 18)
 
-        # ---------------- Requests ----------------
+        # Requests
         requests_sheet = workbook.add_worksheet("Requests")
 
         request_headers = [
@@ -258,9 +264,11 @@ def export_to_excel(records, budgets):
             "Event Date",
             "Participants",
             "Requested",
-            "Estimated Eligible",
-            "Status",
-            "Budget Committed"
+            "Estimated / Provisional Eligible",
+            "Assessment Status",
+            "Processing Status",
+            "Budget Committed",
+            "Processing Error",
         ]
 
         for column, header in enumerate(request_headers):
@@ -278,12 +286,14 @@ def export_to_excel(records, budgets):
                 record.get("expected_participants", 0),
                 assessment.get("total_requested", 0),
                 assessment.get("estimated_eligible_amount", 0),
-                assessment.get("status", record.get("processing_status", "")),
-                record.get("budget_amount", 0)
+                assessment.get("status", ""),
+                record.get("processing_status", ""),
+                record.get("budget_amount", 0),
+                record.get("processing_error", "") or "",
             ]
 
             for column, value in enumerate(values):
-                if column in (6, 7, 9):
+                if column in (6, 7, 10):
                     requests_sheet.write(row, column, value, money_format)
                 else:
                     requests_sheet.write(row, column, value)
@@ -294,7 +304,8 @@ def export_to_excel(records, budgets):
         requests_sheet.set_column("D:D", 28)
         requests_sheet.set_column("E:E", 14)
         requests_sheet.set_column("F:F", 12)
-        requests_sheet.set_column("G:J", 20)
+        requests_sheet.set_column("G:K", 22)
+        requests_sheet.set_column("L:L", 50)
 
         # Expenses
         expenses_sheet = workbook.add_worksheet("Expenses")
@@ -307,7 +318,7 @@ def export_to_excel(records, budgets):
             "Description",
             "AI Category",
             "Amount",
-            "Quote Available"
+            "Quote Available",
         ]
 
         for column, header in enumerate(expense_headers):
@@ -335,12 +346,12 @@ def export_to_excel(records, budgets):
                     expense.get("description", ""),
                     ai_expense.get("category", ""),
                     expense.get("amount", 0),
-                    "Yes" if expense.get("quote_available") else "No"
+                    ("Yes" if expense.get("quote_available") else "No"),
                 ]
 
                 for column, value in enumerate(values):
                     if column == 6:
-                        expenses_sheet.write(expense_row,column,value,money_format)
+                        expenses_sheet.write(expense_row, column, value, money_format)
                     else:
                         expenses_sheet.write(expense_row, column, value)
 
@@ -361,44 +372,39 @@ def export_to_excel(records, budgets):
             "Annual Budget",
             "Used / Committed",
             "Remaining",
-            "% Used"
+            "% Used",
         ]
 
         for column, header in enumerate(budget_headers):
             budget_sheet.write(0, column, header, header_format)
 
-        years = sorted({record.get("funding_year")
-            for record in records
-            if record.get("funding_year") is not None
-        })
+        years = sorted(
+            {
+                record.get("funding_year")
+                for record in records
+                if record.get("funding_year") is not None
+            }
+        )
 
         budget_row = 1
 
         for year in years:
             for club in get_club_names(budgets):
-                info = get_budget_info(records,budgets,club,year)
+                info = get_budget_info(records, budgets, club, year)
+
                 percent_used = 0
 
                 if info["annual_budget"] > 0:
-                    percent_used = (
-                        info["used_budget"]
-                        / info["annual_budget"]
-                    )
+                    percent_used = info["used_budget"] / info["annual_budget"]
 
                 budget_sheet.write(budget_row, 0, club)
                 budget_sheet.write(budget_row, 1, year)
-                budget_sheet.write(
-                    budget_row, 2, info["annual_budget"], money_format
-                )
-                budget_sheet.write(
-                    budget_row, 3, info["used_budget"], money_format
-                )
+                budget_sheet.write(budget_row, 2, info["annual_budget"], money_format)
+                budget_sheet.write(budget_row, 3, info["used_budget"], money_format)
                 budget_sheet.write(
                     budget_row, 4, info["remaining_budget"], money_format
                 )
-                budget_sheet.write(
-                    budget_row, 5, percent_used, percent_format
-                )
+                budget_sheet.write(budget_row, 5, percent_used, percent_format)
 
                 budget_row += 1
 
@@ -408,7 +414,7 @@ def export_to_excel(records, budgets):
         budget_sheet.set_column("F:F", 12)
         workbook.close()
 
-        return True, f"Excel report created: {EXCEL_FILE}"
+        return True, (f"Excel report created: " f"{EXCEL_FILE}")
 
     except Exception as error:
-        return False, f"Could not create Excel report: {error}"
+        return False, (f"Could not create Excel report: " f"{error}")
