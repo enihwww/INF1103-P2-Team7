@@ -462,3 +462,78 @@ class Assessment:
         assessment._budget_to_commit = data.get("budget_to_commit", 0.0)
         assessment._remaining_budget_after = data.get("remaining_budget_after", 0.0)
         return assessment
+
+class FundingRecord:
+    """A saved request together with its AI result and assessment."""
+
+    PROCESSED = "PROCESSED"
+    AI_FAILED = "AI_FAILED"
+
+    def __init__(self, request, ai_result, assessment, processing_status,
+                 processing_error=None, budget_committed=False, budget_amount=0.0):
+        self._request = request
+        self._ai_result = ai_result
+        self._assessment = assessment
+        self._processing_status = processing_status
+        self._processing_error = processing_error
+        self._budget_committed = budget_committed
+        self._budget_amount = budget_amount
+
+    @property
+    def request(self):
+        return self._request
+
+    @property
+    def request_id(self):
+        return self._request.request_id
+
+    @property
+    def club_name(self):
+        return self._request.club_name
+
+    @property
+    def funding_year(self):
+        return self._request.funding_year
+
+    @property
+    def ai_result(self):
+        return self._ai_result
+
+    @property
+    def assessment(self):
+        return self._assessment
+
+    @property
+    def processing_status(self):
+        return self._processing_status
+
+    @property
+    def processing_error(self):
+        return self._processing_error
+
+    @property
+    def budget_committed(self):
+        return self._budget_committed
+
+    @property
+    def budget_amount(self):
+        return self._budget_amount
+
+    def to_dict(self):
+        record = self._request.to_dict()
+        record["ai_result"] = self._ai_result
+        record["assessment"] = self._assessment.to_dict() if self._assessment else None
+        record["processing_status"] = self._processing_status
+        record["processing_error"] = self._processing_error
+        record["budget_committed"] = self._budget_committed
+        record["budget_amount"] = self._budget_amount
+        return record
+
+    @classmethod
+    def from_dict(cls, data):
+        assessment_data = data.get("assessment")
+        assessment = Assessment.from_dict(assessment_data) if assessment_data else None
+
+        return cls(FundingRequest.from_dict(data), data.get("ai_result"), assessment,
+                   data.get("processing_status", ""), data.get("processing_error"),
+                   data.get("budget_committed", False), data.get("budget_amount", 0.0))
