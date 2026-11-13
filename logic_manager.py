@@ -163,3 +163,43 @@ class IneligibleCategoryRule(BusinessRule):
                 assessment.add_issue(f"{expense.expense_id} ({category}) is not fundable.")
                 assessment.add_check(Check.FAIL, f"{expense.expense_id} ({category}) is not fundable.")
         return amount_removed
+
+#parent class for rules that limit the total(food and prize)
+class CategoryLimitRule(BusinessRule):
+    category: str = ""
+
+    #returns the amount over the limit which is removed from the eligible amount
+    def evaluate(self, context: RuleContext, assessment: Assessment) -> float:
+        total = context.category_total(self.category)
+        limit = self._limit(context)
+
+        if self._applies(context) and total > limit:
+            excess = total - limit
+            assessment.add_issue(self._issue_message(excess))
+            assessment.add_check(Check.FAIL, self._fail_message(limit))
+            return excess
+        if total > 0:
+            assessment.add_check(Check.PASS, self._pass_message())
+        return 0.0
+
+    #whether the limit applies to this request
+    def _applies(self, context: RuleContext) -> bool:
+        return True
+
+    #the limit for this category
+    @abstractmethod
+    def _limit(self, context: RuleContext) -> float:
+        pass
+
+    #messages for the issue, FAIL and PASS checks
+    @abstractmethod
+    def _issue_message(self, excess: float) -> str:
+        pass
+
+    @abstractmethod
+    def _fail_message(self, limit: float) -> str:
+        pass
+
+    @abstractmethod
+    def _pass_message(self) -> str:
+        pass
