@@ -1,17 +1,22 @@
+from __future__ import annotations
+
 import json
 import os
-from openai import OpenAI
+from abc import ABC, abstractmethod
+from typing import Any
+
+from models import VALID_CATEGORIES, VALID_EVENT_TYPES, FundingRequest, JsonDict
+
+try:
+    from openai import OpenAI
+except ImportError:
+    # Handled in OpenAIClassifier.classify() so the rest of the app still runs.
+    OpenAI = None
 
 
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
 MAX_ATTEMPTS = 3
-
-VALID_EVENT_TYPES = {"competition", "workshop", "social",
-    "training", "community_service", "other", "unknown"}
-
-VALID_CATEGORIES = {"food","prize", "reusable_equipment",
-    "venue","transport", "marketing",
-    "decoration", "other", "unknown"}
+REQUEST_TIMEOUT = 30  # seconds before one API call is treated as failed
 
 AI_INSTRUCTIONS = """
 You classify student club funding requests.
@@ -41,23 +46,29 @@ If an expense is unclear, use "unknown" and set "ambiguous" to true.
 """.strip()
 
 
-# Create the record that is sent to the AI.
-def build_prompt(request):
-    ai_input = {
-        "event_title": request["event_title"],
-        "event_description": request["event_description"],
-        "expected_participants": request["expected_participants"],
-        "expenses": [
-            {
-                "expense_id": expense["expense_id"],
-                "description": expense["description"],
-                "amount": expense["amount"]
-            }
-            for expense in request["expenses"]
-        ]
-    }
+class AIServiceError(Exception):
+    """Raised when the live AI service cannot be used."""
 
-    return json.dumps(ai_input, indent=2)
+
+class PromptBuilder:
+    """Creates the record that is sent to the AI."""
+
+    def build(self, request: FundingRequest) -> str:
+        ai_input = {
+            "event_title": request.event_title,
+            "event_description": request.event_description,
+            "expected_participants": request.expected_participants,
+            "expenses": [
+                {
+                    "expense_id": expense.expense_id,
+                    "description": expense.description,
+                    "amount": expense.amount
+                }
+                for expense in request.expenses
+            ]
+        }
+
+        return json.dumps(ai_input, indent=2)
 
 
 def validate_result(result, request):
