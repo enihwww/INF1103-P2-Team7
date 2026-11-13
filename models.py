@@ -300,3 +300,26 @@ class Policy:
         cleaned["disabled_rules"] = list(dict.fromkeys(disabled))
 
         return cleaned
+
+class Check:
+    """One PASS, FAIL or REVIEW message."""
+
+    PASS = "PASS"
+    FAIL = "FAIL"
+    REVIEW = "REVIEW"
+    SKIPPED = "SKIPPED"  # rule turned off by an admin; does not affect the status
+
+    def __init__(self, result, message):
+        self._result = result
+        self._message = message
+
+    @property
+    def result(self):
+        return self._result
+
+    @property
+    def message(self):
+        return self._message
+
+    def to_dict(self):
+        return {"result": self._result, "message": self._message}
