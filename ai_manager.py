@@ -183,28 +183,39 @@ class FallbackClassifier(AIClassifier):
         }
 
 
-# Send a funding request to the AI and return validated JSON.
-def analyse_request(request):
-    prompt = build_prompt(request)
-    last_error = "Unknown AI error."
+class AIManager:
+    """Sends every request through the AI and returns validated JSON."""
 
-    for _ in range(MAX_ATTEMPTS):
+    def __init__(self, classifier: AIClassifier, fallback: AIClassifier | None = None, max_attempts: int = MAX_ATTEMPTS) -> None:
+        # Aggregation: classifiers are passed in, so tests can use a stub.
+        self._classifier = classifier
+        self._fallback = fallback or FallbackClassifier()
+        self._max_attempts = max_attempts
+        # Composition: the manager owns its validator.
+        self._validator = ResponseValidator()
 
-        try:
-            client = OpenAI()
-            response = client.responses.create(model=MODEL, instructions=AI_INSTRUCTIONS, input=prompt)
-            result = json.loads(response.output_text)
-            valid, error = validate_result(result, request)
+    def validate_result(self, result: Any, request: FundingRequest) -> tuple[bool, str]:
+        return self._validator.validate(result, request)
 
-            if valid:
-                return result, None
+    def analyse_request(self, request: FundingRequest) -> tuple[JsonDict, str | None]:
+        last_error = "Unknown AI error."
 
-            last_error = error
+        for _ in range(self._max_attempts):
+            try:
+                result = self._classifier.classify(request)
+                # Every result is validated here, whichever classifier produced it.
+                valid, error = self.validate_result(result, request)
 
-        except Exception as error:
-            last_error = str(error)
+                if valid:
+                    return result, None
 
-    # The live API was attempted but failed. Return a safe fallback so the rest of the application can still calculate non-AI values and produce a MANUAL_REVIEW outcome.
-    fallback_result = build_fallback_result(request)
+                last_error = error
 
-    return fallback_result, (f"AI processing failed after {MAX_ATTEMPTS} attempts: {last_error}")
+            except Exception as error:
+                last_error = str(error)
+
+        # The live API was attempted but failed. Return a safe fallback so the rest of the
+        # application can still calculate non-AI values and produce a MANUAL_REVIEW outcome.
+        fallback_result = self._fallback.classify(request)
+
+        return fallback_result, (f"AI processing failed after {self._max_attempts} attempts: {last_error}")
