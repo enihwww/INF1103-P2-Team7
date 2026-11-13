@@ -164,6 +164,7 @@ class IneligibleCategoryRule(BusinessRule):
                 assessment.add_check(Check.FAIL, f"{expense.expense_id} ({category}) is not fundable.")
         return amount_removed
 
+
 #parent class for rules that limit the total(food and prize)
 class CategoryLimitRule(BusinessRule):
     category: str = ""
@@ -203,3 +204,42 @@ class CategoryLimitRule(BusinessRule):
     @abstractmethod
     def _pass_message(self) -> str:
         pass
+
+#rule 6: food must stay under the per-person limit
+class FoodLimitRule(CategoryLimitRule):
+    rule_id = "food_limit"
+    category = "food"
+
+    #food limit = number of people x limit per person
+    def _limit(self, context: RuleContext) -> float:
+        return context.request.expected_participants * context.policy.food_per_person_limit
+
+    def _issue_message(self, excess: float) -> str:
+        return f"Food exceeds the allowed amount by ${excess:.2f}."
+
+    def _fail_message(self, limit: float) -> str:
+        return f"Food limit is ${limit:.2f}."
+
+    def _pass_message(self) -> str:
+        return "Food spending is within the limit."
+
+#rule 7: competitions have a prize limit (multi-condition rule using ai output)
+class PrizeLimitRule(CategoryLimitRule):
+    rule_id = "prize_limit"
+    category = "prize"
+
+    #only check prizes if the ai says the event is a competition
+    def _applies(self, context: RuleContext) -> bool:
+        return context.ai_result["event_type"] == "competition"
+
+    def _limit(self, context: RuleContext) -> float:
+        return context.policy.max_prize_amount
+
+    def _issue_message(self, excess: float) -> str:
+        return f"Competition prizes exceed the limit by ${excess:.2f}."
+
+    def _fail_message(self, limit: float) -> str:
+        return f"Competition prize limit is ${limit:.2f}."
+
+    def _pass_message(self) -> str:
+        return "No prize-limit problem."
