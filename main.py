@@ -82,3 +82,30 @@ class CommandLineApp:
         if success:
             self._io.show_policy(self._app.data_manager.policy)
 
+class Launcher:
+    """Starts either the command-line menu or the GUI."""
+
+    def __init__(self, arguments):
+        self._use_gui = "--gui" in arguments
+
+    def run(self):
+        io = ConsoleIO()
+        app, warning, error = ClubFundApp.create()
+
+        if warning:
+            io.show_message(warning)
+
+        if error:
+            io.show_message(error)
+            return
+
+        if self._use_gui:
+            # Imported here so the CLI and tests do not need Flask.
+            from gui_manager import WebGUI
+            WebGUI(app).run()
+        else:
+            CommandLineApp(app, io).run()
+
+
+if __name__ == "__main__":
+    Launcher(sys.argv[1:]).run()
