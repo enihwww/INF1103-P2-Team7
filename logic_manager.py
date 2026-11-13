@@ -146,3 +146,20 @@ class EquipmentQuoteRule(BusinessRule):
                 assessment.add_check(Check.FAIL, f"{expense.expense_id} needs a quote (${quote_limit:.2f} or more).")
         return 0.0
 
+#rule 5: some categories cannot be funded
+#returns the amount to remove from the eligible amount
+class IneligibleCategoryRule(BusinessRule):
+    rule_id: str = "ineligible_category"
+
+    def evaluate(self, context: RuleContext, assessment: Assessment) -> float:
+        ineligible_categories = context.policy.ineligible_categories
+        amount_removed = 0.0
+
+        for expense in context.request.expenses:
+            category = context.category_of(expense)
+
+            if category in ineligible_categories:
+                amount_removed = amount_removed + expense.amount
+                assessment.add_issue(f"{expense.expense_id} ({category}) is not fundable.")
+                assessment.add_check(Check.FAIL, f"{expense.expense_id} ({category}) is not fundable.")
+        return amount_removed
