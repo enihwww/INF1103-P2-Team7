@@ -243,3 +243,53 @@ class PrizeLimitRule(CategoryLimitRule):
 
     def _pass_message(self) -> str:
         return "No prize-limit problem."
+
+
+#apply all business rules to a request that the ai has already classified
+class LogicManager:
+    def __init__(self, policy: Policy, rules: list[BusinessRule]) -> None:
+        self._policy: Policy = policy
+        self._rules: list[BusinessRule] = list(rules)
+
+    @staticmethod
+    def default_rules() -> list[BusinessRule]:
+        return [RequestLimitRule(), 
+                RemainingBudgetRule(), 
+                LeadTimeRule(),
+                UnclearInformationRule(), 
+                EquipmentQuoteRule(),
+                IneligibleCategoryRule(), 
+                FoodLimitRule(), 
+                PrizeLimitRule()]
+
+    #run every rule on the request and return the assessment (status, checks, issues, amounts)
+    def assess_request(self, request: FundingRequest, ai_result: JsonDict, budget_info: BudgetInfo) -> Assessment:
+        context = RuleContext(request, ai_result, self._policy, budget_info)
+        remaining_budget = budget_info["remaining_budget"]
+
+        #budget info comes from data_manager
+        assessment = Assessment(request.funding_year, budget_info["annual_budget"],
+                                budget_info["used_budget"], remaining_budget,
+                                context.total_requested, context.lead_days)
+
+        eligible_amount = context.total_requested
+        caps: list[float] = [context.total_requested]
+        for rule in self._rules:
+            #skip a rule if the admin turned it off in the policy
+            if not self._policy.is_rule_enabled(rule.rule_id):
+                assessment.add_check(Check.SKIPPED, f"{rule.label} rule is turned off by an admin.")
+                continue
+
+            eligible_amount = eligible_amount - rule.evaluate(context, assessment)
+
+            #collect the limits from rule 1 and 2
+            limit = rule.cap(context)
+            if limit is not None:
+                caps.append(limit)
+
+        eligible_amount = min([eligible_amount] + caps)
+        eligible_amount = round(max(0, eligible_amount), 2)
+
+        #decide the final status and how much budget to commit
+        assessment.finalise(eligible_amount)
+        return assessment
