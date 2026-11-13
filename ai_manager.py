@@ -1,17 +1,22 @@
+from __future__ import annotations
+
 import json
 import os
-from openai import OpenAI
+from abc import ABC, abstractmethod
+from typing import Any
+
+from models import VALID_CATEGORIES, VALID_EVENT_TYPES, FundingRequest, JsonDict
+
+try:
+    from openai import OpenAI
+except ImportError:
+    # Handled in OpenAIClassifier.classify() so the rest of the app still runs.
+    OpenAI = None
 
 
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
 MAX_ATTEMPTS = 3
-
-VALID_EVENT_TYPES = {"competition", "workshop", "social",
-    "training", "community_service", "other", "unknown"}
-
-VALID_CATEGORIES = {"food","prize", "reusable_equipment",
-    "venue","transport", "marketing",
-    "decoration", "other", "unknown"}
+REQUEST_TIMEOUT = 30  # seconds before one API call is treated as failed
 
 AI_INSTRUCTIONS = """
 You classify student club funding requests.
@@ -41,135 +46,176 @@ If an expense is unclear, use "unknown" and set "ambiguous" to true.
 """.strip()
 
 
-# Create the record that is sent to the AI.
-def build_prompt(request):
-    ai_input = {
-        "event_title": request["event_title"],
-        "event_description": request["event_description"],
-        "expected_participants": request["expected_participants"],
-        "expenses": [
-            {
-                "expense_id": expense["expense_id"],
-                "description": expense["description"],
-                "amount": expense["amount"]
-            }
-            for expense in request["expenses"]
-        ]
-    }
-
-    return json.dumps(ai_input, indent=2)
+class AIServiceError(Exception):
+    """Raised when the live AI service cannot be used."""
 
 
-def validate_result(result, request):
-    """Check that the AI returned the JSON structure we expect."""
+class PromptBuilder:
+    """Creates the record that is sent to the AI."""
 
-    if not isinstance(result, dict):
-        return False, "AI response is not a JSON object."
+    def build(self, request: FundingRequest) -> str:
+        ai_input = {
+            "event_title": request.event_title,
+            "event_description": request.event_description,
+            "expected_participants": request.expected_participants,
+            "expenses": [
+                {
+                    "expense_id": expense.expense_id,
+                    "description": expense.description,
+                    "amount": expense.amount
+                }
+                for expense in request.expenses
+            ]
+        }
 
-    required_fields = ["event_type", "event_purpose", "expenses", "missing_information"]
+        return json.dumps(ai_input, indent=2)
 
-    for field in required_fields:
-        if field not in result:
-            return False, f"Missing AI field: {field}"
 
-    if result["event_type"] not in VALID_EVENT_TYPES:
-        return False, "Invalid event_type returned by AI."
+class ResponseValidator:
+    """Checks that the AI returned the JSON structure we expect."""
 
-    if not isinstance(result["event_purpose"], str):
-        return False, "event_purpose must be text."
+    def validate(self, result: Any, request: FundingRequest) -> tuple[bool, str]:
+        if not isinstance(result, dict):
+            return False, "AI response is not a JSON object."
 
-    if not isinstance(result["expenses"], list):
-        return False, "expenses must be a list."
+        required_fields = ["event_type", "event_purpose", "expenses", "missing_information"]
 
-    if not isinstance(result["missing_information"], list):
-        return False, "missing_information must be a list."
+        for field in required_fields:
+            if field not in result:
+                return False, f"Missing AI field: {field}"
 
-    expected_ids = {expense["expense_id"] for expense in request["expenses"]}
-    returned_ids = set()
+        if result["event_type"] not in VALID_EVENT_TYPES:
+            return False, "Invalid event_type returned by AI."
 
-    for expense in result["expenses"]:
+        if not isinstance(result["event_purpose"], str):
+            return False, "event_purpose must be text."
 
-        if not isinstance(expense, dict):
-            return False, "Each AI expense must be a JSON object."
+        if not isinstance(result["expenses"], list):
+            return False, "expenses must be a list."
 
-        for field in ["expense_id", "category", "purpose", "ambiguous"]:
-            if field not in expense:
-                return False, f"AI expense is missing: {field}"
+        if not isinstance(result["missing_information"], list):
+            return False, "missing_information must be a list."
 
-        if expense["category"] not in VALID_CATEGORIES:
-            return False, (f"Invalid expense category: {expense['category']}")
+        expected_ids = {expense.expense_id for expense in request.expenses}
+        returned_ids = set()
 
-        if not isinstance(expense["purpose"], str):
-            return False, "Expense purpose must be text."
+        for expense in result["expenses"]:
 
-        if not isinstance(expense["ambiguous"], bool):
-            return False, "ambiguous must be true or false."
+            if not isinstance(expense, dict):
+                return False, "Each AI expense must be a JSON object."
 
-        if expense["expense_id"] in returned_ids:
-            return False, "AI returned a duplicate expense ID."
+            for field in ["expense_id", "category", "purpose", "ambiguous"]:
+                if field not in expense:
+                    return False, f"AI expense is missing: {field}"
 
-        returned_ids.add(expense["expense_id"])
+            if expense["category"] not in VALID_CATEGORIES:
+                return False, (f"Invalid expense category: {expense['category']}")
 
-    if returned_ids != expected_ids:
-        return False, ("AI expense IDs do not match the submitted expenses.")
+            if not isinstance(expense["purpose"], str):
+                return False, "Expense purpose must be text."
 
-    if not all(isinstance(item, str) for item in result["missing_information"]):
-        return False, ("missing_information must contain text only.")
+            if not isinstance(expense["ambiguous"], bool):
+                return False, "ambiguous must be true or false."
 
-    return True, ""
+            if expense["expense_id"] in returned_ids:
+                return False, "AI returned a duplicate expense ID."
 
-def build_fallback_result(request):
-    """Create a safe result when the live AI service is unavailable.
+            returned_ids.add(expense["expense_id"])
 
-    This is NOT an AI replacement.
+        if returned_ids != expected_ids:
+            return False, ("AI expense IDs do not match the submitted expenses.")
 
-    All AI-dependent fields are marked unknown/ambiguous so that
-    logic_manager sends the request to MANUAL_REVIEW.
+        if not all(isinstance(item, str) for item in result["missing_information"]):
+            return False, ("missing_information must contain text only.")
 
-    Deterministic values such as total amount, dates and annual budget
-    can still be processed by the rest of the program.
+        return True, ""
+
+class AIClassifier(ABC):
+    """Interface for anything that can classify a funding request."""
+
+    @abstractmethod
+    def classify(self, request: FundingRequest) -> Any:
+        """Return the parsed AI result, or raise an exception on failure."""
+
+
+class OpenAIClassifier(AIClassifier):
+    """Live classifier that calls the OpenAI API."""
+
+    def __init__(self, model: str = MODEL, timeout: float = REQUEST_TIMEOUT) -> None:
+        self._model = model
+        self._timeout = timeout
+        # Composition: the classifier creates and owns its prompt builder.
+        self._prompt_builder = PromptBuilder()
+
+    def classify(self, request: FundingRequest) -> Any:
+        if OpenAI is None:
+            raise AIServiceError("The openai package is not installed.")
+
+        client = OpenAI(timeout=self._timeout)
+        response = client.responses.create(model=self._model, instructions=AI_INSTRUCTIONS,
+                                           input=self._prompt_builder.build(request))
+        # A malformed reply raises json.JSONDecodeError, handled by AIManager.
+        return json.loads(response.output_text)
+
+class FallbackClassifier(AIClassifier):
+    """Safe result when the live AI service is unavailable.
+
+    This is NOT an AI replacement. All AI-dependent fields are marked
+    unknown/ambiguous so the logic manager sends the request to MANUAL_REVIEW.
     """
 
-    expenses = []
+    def classify(self, request: FundingRequest) -> JsonDict:
+        expenses = []
 
-    for expense in request["expenses"]:
-        expenses.append({
-            "expense_id": expense["expense_id"],
-            "category": "unknown",
-            "purpose": "Not classified because AI service was unavailable.",
-            "ambiguous": True
-        })
+        for expense in request.expenses:
+            expenses.append({
+                "expense_id": expense.expense_id,
+                "category": "unknown",
+                "purpose": "Not classified because AI service was unavailable.",
+                "ambiguous": True
+            })
 
-    return {
-        "event_type": "unknown",
-        "event_purpose": ("Not classified because AI service was unavailable."),
-        "expenses": expenses,
-        "missing_information": ["AI classification unavailable. Manual review is required."]
-    }
+        return {
+            "event_type": "unknown",
+            "event_purpose": ("Not classified because AI service was unavailable."),
+            "expenses": expenses,
+            "missing_information": ["AI classification unavailable. Manual review is required."]
+        }
 
 
-# Send a funding request to the AI and return validated JSON.
-def analyse_request(request):
-    prompt = build_prompt(request)
-    last_error = "Unknown AI error."
+class AIManager:
+    """Sends every request through the AI and returns validated JSON."""
 
-    for _ in range(MAX_ATTEMPTS):
+    def __init__(self, classifier: AIClassifier, fallback: AIClassifier | None = None, max_attempts: int = MAX_ATTEMPTS) -> None:
+        # Aggregation: classifiers are passed in, so tests can use a stub.
+        self._classifier = classifier
+        self._fallback = fallback or FallbackClassifier()
+        self._max_attempts = max_attempts
+        # Composition: the manager owns its validator.
+        self._validator = ResponseValidator()
 
-        try:
-            client = OpenAI()
-            response = client.responses.create(model=MODEL, instructions=AI_INSTRUCTIONS, input=prompt)
-            result = json.loads(response.output_text)
-            valid, error = validate_result(result, request)
+    def validate_result(self, result: Any, request: FundingRequest) -> tuple[bool, str]:
+        return self._validator.validate(result, request)
 
-            if valid:
-                return result, None
+    def analyse_request(self, request: FundingRequest) -> tuple[JsonDict, str | None]:
+        last_error = "Unknown AI error."
 
-            last_error = error
+        for _ in range(self._max_attempts):
+            try:
+                result = self._classifier.classify(request)
+                # Every result is validated here, whichever classifier produced it.
+                valid, error = self.validate_result(result, request)
 
-        except Exception as error:
-            last_error = str(error)
+                if valid:
+                    return result, None
 
-    # The live API was attempted but failed. Return a safe fallback so the rest of the application can still calculate non-AI values and produce a MANUAL_REVIEW outcome.
-    fallback_result = build_fallback_result(request)
+                last_error = error
 
-    return fallback_result, (f"AI processing failed after {MAX_ATTEMPTS} attempts: {last_error}")
+            except Exception as error:
+                last_error = str(error)
+
+        # The live API was attempted but failed. Return a safe fallback so the rest of the
+        # application can still calculate non-AI values and produce a MANUAL_REVIEW outcome.
+        fallback_result = self._fallback.classify(request)
+
+        return fallback_result, (f"AI processing failed after {self._max_attempts} attempts: {last_error}")
