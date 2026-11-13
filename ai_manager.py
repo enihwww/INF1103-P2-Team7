@@ -157,34 +157,30 @@ class OpenAIClassifier(AIClassifier):
         # A malformed reply raises json.JSONDecodeError, handled by AIManager.
         return json.loads(response.output_text)
 
-def build_fallback_result(request):
-    """Create a safe result when the live AI service is unavailable.
+class FallbackClassifier(AIClassifier):
+    """Safe result when the live AI service is unavailable.
 
-    This is NOT an AI replacement.
-
-    All AI-dependent fields are marked unknown/ambiguous so that
-    logic_manager sends the request to MANUAL_REVIEW.
-
-    Deterministic values such as total amount, dates and annual budget
-    can still be processed by the rest of the program.
+    This is NOT an AI replacement. All AI-dependent fields are marked
+    unknown/ambiguous so the logic manager sends the request to MANUAL_REVIEW.
     """
 
-    expenses = []
+    def classify(self, request: FundingRequest) -> JsonDict:
+        expenses = []
 
-    for expense in request["expenses"]:
-        expenses.append({
-            "expense_id": expense["expense_id"],
-            "category": "unknown",
-            "purpose": "Not classified because AI service was unavailable.",
-            "ambiguous": True
-        })
+        for expense in request.expenses:
+            expenses.append({
+                "expense_id": expense.expense_id,
+                "category": "unknown",
+                "purpose": "Not classified because AI service was unavailable.",
+                "ambiguous": True
+            })
 
-    return {
-        "event_type": "unknown",
-        "event_purpose": ("Not classified because AI service was unavailable."),
-        "expenses": expenses,
-        "missing_information": ["AI classification unavailable. Manual review is required."]
-    }
+        return {
+            "event_type": "unknown",
+            "event_purpose": ("Not classified because AI service was unavailable."),
+            "expenses": expenses,
+            "missing_information": ["AI classification unavailable. Manual review is required."]
+        }
 
 
 # Send a funding request to the AI and return validated JSON.
