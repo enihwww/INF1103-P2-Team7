@@ -130,6 +130,33 @@ class ResponseValidator:
 
         return True, ""
 
+class AIClassifier(ABC):
+    """Interface for anything that can classify a funding request."""
+
+    @abstractmethod
+    def classify(self, request: FundingRequest) -> Any:
+        """Return the parsed AI result, or raise an exception on failure."""
+
+
+class OpenAIClassifier(AIClassifier):
+    """Live classifier that calls the OpenAI API."""
+
+    def __init__(self, model: str = MODEL, timeout: float = REQUEST_TIMEOUT) -> None:
+        self._model = model
+        self._timeout = timeout
+        # Composition: the classifier creates and owns its prompt builder.
+        self._prompt_builder = PromptBuilder()
+
+    def classify(self, request: FundingRequest) -> Any:
+        if OpenAI is None:
+            raise AIServiceError("The openai package is not installed.")
+
+        client = OpenAI(timeout=self._timeout)
+        response = client.responses.create(model=self._model, instructions=AI_INSTRUCTIONS,
+                                           input=self._prompt_builder.build(request))
+        # A malformed reply raises json.JSONDecodeError, handled by AIManager.
+        return json.loads(response.output_text)
+
 def build_fallback_result(request):
     """Create a safe result when the live AI service is unavailable.
 
