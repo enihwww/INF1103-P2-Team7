@@ -1,223 +1,295 @@
-from datetime import date
+from models import BudgetInfo, Expense, FundingRequest, JsonDict, Policy, Assessment, RULE_NAMES, Check
+from abc import ABC, abstractmethod
 
-#add all expense amounts
-def calculate_total(expenses):
-    total = 0
-    for expense in expenses:
-        total += expense["amount"]
-    return round(total, 2)
+#holds the values every rule needs while one request is being checked
+#so each rule does not have to work them out again
+class RuleContext:
+    def __init__(self, request: FundingRequest, ai_result: JsonDict, policy: Policy, budget_info: BudgetInfo) -> None:
+        self.request: FundingRequest = request
+        self.ai_result: JsonDict = ai_result
+        self.policy: Policy = policy
+        self.budget_info: BudgetInfo = budget_info
+        self.ai_expenses: dict[str, JsonDict] = self._build_ai_lookup()
+        self.total_requested: float = request.total_amount()
+        self.lead_days: int = request.lead_days()
 
-#add up the amounts of all expenses in one category (e.g. "food")
-def calculate_category_total(expenses, ai_expenses, category):
-    total = 0
-    for expense in expenses:
-        expense_id = expense["expense_id"]
-        if ai_expenses[expense_id]["category"] == category:
-            total += expense["amount"]
-    return round(total, 2)
+    #put the ai results in a dictionary so we can look them up by expense id (E1, E2...)
+    def _build_ai_lookup(self) -> dict[str, JsonDict]:
+        ai_expenses = {}
 
-#return the number of days between submission and event
-def calculate_lead_days(submission_date, event_date):
-    submitted = date.fromisoformat(submission_date)
-    event = date.fromisoformat(event_date)
-    return (event - submitted).days
+        for ai_expense in self.ai_result["expenses"]:
+            ai_expenses[ai_expense["expense_id"]] = ai_expense
 
-#store one PASS, FAIL or REVIEW message
-def add_check(checks, result, message):
-    checks.append({"result": result, "message": message})
+        #if the ai missed an expense, mark it as unknown so it goes to manual review
+        for expense in self.request.expenses:
+            if expense.expense_id not in ai_expenses:
+                ai_expenses[expense.expense_id] = {"category": "unknown", "ambiguous": True}
+        return ai_expenses
 
-#return True if any check has this result
-def has_result(checks, result):
-    for check in checks:
-        if check["result"] == result:
-            return True
-    return False
+    #return the ai category of one expense (e.g. "food")
+    def category_of(self, expense: Expense) -> str:
+        return self.ai_expenses[expense.expense_id]["category"]
 
-#put the ai results in a dictionary so we can look them up by expense id (E1, E2...)
-def build_ai_lookup(request, ai_result):
-    ai_expenses = {}
- 
-    for ai_expense in ai_result["expenses"]:
-        ai_expenses[ai_expense["expense_id"]] = ai_expense
- 
-    #if the ai missed an expense, mark it as unknown so it goes to manual review
-    for expense in request["expenses"]:
-        if expense["expense_id"] not in ai_expenses:
-            ai_expenses[expense["expense_id"]] = {"category": "unknown", "ambiguous": True}
-    return ai_expenses
+    #add up the amounts of all expenses in one category (e.g. "food")
+    def category_total(self, category: str) -> float:
+        total = 0.0
+        for expense in self.request.expenses:
+            if self.category_of(expense) == category:
+                total += expense.amount
+        return round(total, 2)
 
+#abstract class for one business rule
+class BusinessRule(ABC):
+    #each child class sets its own id, used to turn rules on or off
+    rule_id: str = ""
+
+    #check the request and add PASS, FAIL or REVIEW messages to the assessment
+    @abstractmethod
+    def evaluate(self, context: RuleContext, assessment: Assessment) -> float:
+        pass
+
+    #for rules 1 and 2
+    def cap(self, context: RuleContext) -> float | None:
+        return None
+
+    @property
+    def label(self) -> str:
+        return RULE_NAMES.get(self.rule_id, type(self).__name__)
 
 #rule 1: maximum amount allowed for one request
-def check_request_limit(total_requested, policy, checks, issues):
-    max_request = policy["max_request_amount"]
- 
-    if total_requested > max_request:
-        issues.append(f"Total request exceeds the ${max_request:.2f} single-request limit.")
-        add_check(checks, "FAIL", "Request is over the single-request limit.")
-    else:
-        add_check(checks, "PASS", "Request is within the single-request limit.")
- 
- 
+class RequestLimitRule(BusinessRule):
+    rule_id: str = "request_limit"
+
+    def evaluate(self, context: RuleContext, assessment: Assessment) -> float:
+        max_request = context.policy.max_request_amount
+        if context.total_requested > max_request:
+            assessment.add_issue(f"Total request exceeds the ${max_request:.2f} single-request limit.")
+            assessment.add_check(Check.FAIL, "Request is over the single-request limit.")
+        else:
+            assessment.add_check(Check.PASS, "Request is within the single-request limit.")
+        return 0.0
+
+    #eligible amount can never be more than the single-request limit
+    def cap(self, context: RuleContext) -> float | None:
+        return context.policy.max_request_amount
+
 #rule 2: club must have enough annual budget left
-def check_remaining_budget(total_requested, budget_info, checks, issues):
-    remaining_budget = budget_info["remaining_budget"]
-    annual_budget = budget_info["annual_budget"]
- 
-    if total_requested > remaining_budget:
-        shortfall = total_requested - remaining_budget
-        issues.append(f"Request exceeds the remaining annual budget by ${shortfall:.2f}.")
-        add_check(checks, "FAIL", f"Only ${remaining_budget:.2f} left from the ${annual_budget:.2f} budget.")
-    else:
-        add_check(checks, "PASS", f"${remaining_budget:.2f} is available before this request.")
- 
- 
+class RemainingBudgetRule(BusinessRule):
+    rule_id: str = "remaining_budget"
+
+    def evaluate(self, context: RuleContext, assessment: Assessment) -> float:
+        remaining_budget = context.budget_info["remaining_budget"]
+        annual_budget = context.budget_info["annual_budget"]
+
+        if context.total_requested > remaining_budget:
+            shortfall = context.total_requested - remaining_budget
+            assessment.add_issue(f"Request exceeds the remaining annual budget by ${shortfall:.2f}.")
+            assessment.add_check(Check.FAIL, f"Only ${remaining_budget:.2f} left from the ${annual_budget:.2f} budget.")
+        else:
+            assessment.add_check(Check.PASS, f"${remaining_budget:.2f} is available before this request.")
+        return 0.0
+
+    #eligible amount can never be more than what the club has left
+    def cap(self, context: RuleContext) -> float | None:
+        return context.budget_info["remaining_budget"]
+
 #rule 3: request must be submitted early enough
-def check_lead_time(lead_days, policy, checks, issues):
-    minimum_days = policy["minimum_lead_days"]
- 
-    if lead_days < minimum_days:
-        issues.append(f"Request must be submitted at least {minimum_days} days before the event.")
-        add_check(checks, "FAIL", f"Only {lead_days} day(s) of lead time.")
-    else:
-        add_check(checks, "PASS", f"{lead_days} day(s) of lead time.")
- 
- 
+class LeadTimeRule(BusinessRule):
+    rule_id: str = "lead_time"
+
+    def evaluate(self, context: RuleContext, assessment: Assessment) -> float:
+        minimum_days = context.policy.minimum_lead_days
+
+        if context.lead_days < minimum_days:
+            assessment.add_issue(f"Request must be submitted at least {minimum_days} days before the event.")
+            assessment.add_check(Check.FAIL, f"Only {context.lead_days} day(s) of lead time.")
+        else:
+            assessment.add_check(Check.PASS, f"{context.lead_days} day(s) of lead time.")
+        return 0.0
+
 #rule 4: missing or unclear ai information needs a human to check
-def check_unclear_information(request, ai_result, ai_expenses, checks, issues):
-    if ai_result["event_type"] == "unknown":
-        issues.append("Event type could not be classified.")
-        add_check(checks, "REVIEW", "Event type needs human review.")
-    if ai_result["missing_information"]:
-        issues.append("Missing information: " + ", ".join(ai_result["missing_information"]))
-        add_check(checks, "REVIEW", "Some request information is missing.")
- 
-    for expense in request["expenses"]:
-        expense_id = expense["expense_id"]
-        ai_expense = ai_expenses[expense_id]
- 
-        if ai_expense["ambiguous"] or ai_expense["category"] == "unknown":
-            issues.append(f"{expense_id} could not be classified clearly.")
-            add_check(checks, "REVIEW", f"{expense_id} needs human review.")
- 
- 
+class UnclearInformationRule(BusinessRule):
+    rule_id: str = "unclear_information"
+    def evaluate(self, context: RuleContext, assessment: Assessment) -> float:
+        ai_result = context.ai_result
+
+        if ai_result["event_type"] == "unknown":
+            assessment.add_issue("Event type could not be classified.")
+            assessment.add_check(Check.REVIEW, "Event type needs human review.")
+
+        if ai_result["missing_information"]:
+            assessment.add_issue("Missing information: " + ", ".join(ai_result["missing_information"]))
+            assessment.add_check(Check.REVIEW, "Some request information is missing.")
+
+        #when ai could not classify an expense clearly
+        for expense in context.request.expenses:
+            ai_expense = context.ai_expenses[expense.expense_id]
+
+            if ai_expense["ambiguous"] or ai_expense["category"] == "unknown":
+                assessment.add_issue(f"{expense.expense_id} could not be classified clearly.")
+                assessment.add_check(Check.REVIEW, f"{expense.expense_id} needs human review.")
+        return 0.0
+
+#rule 8: expensive reusable equipment needs a supplier quote (multi-condition rule)
+class EquipmentQuoteRule(BusinessRule):
+    rule_id: str = "equipment_quote"
+
+    def evaluate(self, context: RuleContext, assessment: Assessment) -> float:
+        quote_limit = context.policy.equipment_quote_threshold
+
+        for expense in context.request.expenses:
+            category = context.category_of(expense)
+
+            #all 3 conditions must be true: equipment, over the limit and no quote
+            if category == "reusable_equipment" and expense.amount >= quote_limit and not expense.quote_available:
+                assessment.add_issue(f"{expense.expense_id} requires a supplier quote.")
+                assessment.add_check(Check.FAIL, f"{expense.expense_id} needs a quote (${quote_limit:.2f} or more).")
+        return 0.0
+
 #rule 5: some categories cannot be funded
 #returns the amount to remove from the eligible amount
-def check_ineligible_categories(request, ai_expenses, policy, checks, issues):
-    ineligible_categories = policy["ineligible_categories"]
-    amount_removed = 0
- 
-    for expense in request["expenses"]:
-        expense_id = expense["expense_id"]
-        category = ai_expenses[expense_id]["category"]
- 
-        if category in ineligible_categories:
-            amount_removed = amount_removed + expense["amount"]
-            issues.append(f"{expense_id} ({category}) is not fundable.")
-            add_check(checks, "FAIL", f"{expense_id} ({category}) is not fundable.")
-    return amount_removed
- 
+class IneligibleCategoryRule(BusinessRule):
+    rule_id: str = "ineligible_category"
+
+    def evaluate(self, context: RuleContext, assessment: Assessment) -> float:
+        ineligible_categories = context.policy.ineligible_categories
+        amount_removed = 0.0
+
+        for expense in context.request.expenses:
+            category = context.category_of(expense)
+
+            if category in ineligible_categories:
+                amount_removed = amount_removed + expense.amount
+                assessment.add_issue(f"{expense.expense_id} ({category}) is not fundable.")
+                assessment.add_check(Check.FAIL, f"{expense.expense_id} ({category}) is not fundable.")
+        return amount_removed
+
+
+#parent class for rules that limit the total(food and prize)
+class CategoryLimitRule(BusinessRule):
+    category: str = ""
+
+    #returns the amount over the limit which is removed from the eligible amount
+    def evaluate(self, context: RuleContext, assessment: Assessment) -> float:
+        total = context.category_total(self.category)
+        limit = self._limit(context)
+
+        if self._applies(context) and total > limit:
+            excess = total - limit
+            assessment.add_issue(self._issue_message(excess))
+            assessment.add_check(Check.FAIL, self._fail_message(limit))
+            return excess
+        if total > 0:
+            assessment.add_check(Check.PASS, self._pass_message())
+        return 0.0
+
+    #whether the limit applies to this request
+    def _applies(self, context: RuleContext) -> bool:
+        return True
+
+    #the limit for this category
+    @abstractmethod
+    def _limit(self, context: RuleContext) -> float:
+        pass
+
+    #messages for the issue, FAIL and PASS checks
+    @abstractmethod
+    def _issue_message(self, excess: float) -> str:
+        pass
+
+    @abstractmethod
+    def _fail_message(self, limit: float) -> str:
+        pass
+
+    @abstractmethod
+    def _pass_message(self) -> str:
+        pass
+
 #rule 6: food must stay under the per-person limit
-#returns the amount to remove from the eligible amount
-def check_food_limit(request, ai_expenses, policy, checks, issues):
-    total_food = calculate_category_total(request["expenses"], ai_expenses, "food")
-    food_limit = request["expected_participants"] * policy["food_per_person_limit"]
- 
-    if total_food > food_limit:
-        excess = total_food - food_limit
-        issues.append(f"Food exceeds the allowed amount by ${excess:.2f}.")
-        add_check(checks, "FAIL", f"Food limit is ${food_limit:.2f}.")
-        return excess
- 
-    if total_food > 0:
-        add_check(checks, "PASS", "Food spending is within the limit.")
-    return 0
- 
+class FoodLimitRule(CategoryLimitRule):
+    rule_id = "food_limit"
+    category = "food"
+
+    #food limit = number of people x limit per person
+    def _limit(self, context: RuleContext) -> float:
+        return context.request.expected_participants * context.policy.food_per_person_limit
+
+    def _issue_message(self, excess: float) -> str:
+        return f"Food exceeds the allowed amount by ${excess:.2f}."
+
+    def _fail_message(self, limit: float) -> str:
+        return f"Food limit is ${limit:.2f}."
+
+    def _pass_message(self) -> str:
+        return "Food spending is within the limit."
+
 #rule 7: competitions have a prize limit (multi-condition rule using ai output)
-#returns the amount to remove from the eligible amount
-def check_prize_limit(request, ai_result, ai_expenses, policy, checks, issues):
-    total_prizes = calculate_category_total(request["expenses"], ai_expenses, "prize")
-    prize_limit = policy["max_prize_amount"]
- 
-    if ai_result["event_type"] == "competition" and total_prizes > prize_limit:
-        excess = total_prizes - prize_limit
-        issues.append(f"Competition prizes exceed the limit by ${excess:.2f}.")
-        add_check(checks, "FAIL", f"Competition prize limit is ${prize_limit:.2f}.")
-        return excess
- 
-    if total_prizes > 0:
-        add_check(checks, "PASS", "No prize-limit problem.")
-    return 0
- 
-#rule 8: expensive reusable equipment needs a supplier quote (multi-condition rule)
-def check_equipment_quotes(request, ai_expenses, policy, checks, issues):
-    quote_limit = policy["equipment_quote_threshold"]
- 
-    for expense in request["expenses"]:
-        expense_id = expense["expense_id"]
-        category = ai_expenses[expense_id]["category"]
- 
-        if category == "reusable_equipment" and expense["amount"] >= quote_limit and not expense["quote_available"]:
-            issues.append(f"{expense_id} requires a supplier quote.")
-            add_check(checks, "FAIL", f"{expense_id} needs a quote (${quote_limit:.2f} or more).")
+class PrizeLimitRule(CategoryLimitRule):
+    rule_id = "prize_limit"
+    category = "prize"
 
-def decide_status(checks):
-    if has_result(checks, "REVIEW"):
-        return "MANUAL_REVIEW"
-    if has_result(checks, "FAIL"):
-        return "REVISION_REQUIRED"
-    return "READY_FOR_REVIEW"
+    #only check prizes if the ai says the event is a competition
+    def _applies(self, context: RuleContext) -> bool:
+        return context.ai_result["event_type"] == "competition"
 
-#apply all ClubFund business rules to a request
-def assess_request(request, ai_result, policy, budget_info):
-    checks = []
-    issues = []
+    def _limit(self, context: RuleContext) -> float:
+        return context.policy.max_prize_amount
 
-    ai_expenses = build_ai_lookup(request, ai_result)
-    total_requested = calculate_total(request["expenses"])
-    lead_days = calculate_lead_days(request["submission_date"], request["event_date"])
- 
-    #budget info comes from data_manager
-    annual_budget = budget_info["annual_budget"]
-    used_budget = budget_info["used_budget"]
-    remaining_budget = budget_info["remaining_budget"]
- 
-    check_request_limit(total_requested, policy, checks, issues)
-    check_remaining_budget(total_requested, budget_info, checks, issues)
-    check_lead_time(lead_days, policy, checks, issues)
-    check_unclear_information(request, ai_result, ai_expenses, checks, issues)
-    check_equipment_quotes(request, ai_expenses, policy, checks, issues)
- 
-    #these rules also reduce the eligible amount
-    eligible_amount = total_requested
-    eligible_amount = eligible_amount - check_ineligible_categories(request, ai_expenses, policy, checks, issues)
-    eligible_amount = eligible_amount - check_food_limit(request, ai_expenses, policy, checks, issues)
-    eligible_amount = eligible_amount - check_prize_limit(request, ai_result, ai_expenses, policy, checks, issues)
- 
-    #eligible amount cannot go above the limits or below 0
-    eligible_amount = min(eligible_amount, total_requested, policy["max_request_amount"], remaining_budget)
-    eligible_amount = round(max(0, eligible_amount), 2)
- 
-    status = decide_status(checks)
- 
-    #only take money from the budget if the request is ready
-    if status == "READY_FOR_REVIEW":
-        budget_to_commit = eligible_amount
-    else:
-        budget_to_commit = 0.0
- 
-    remaining_after = round(max(0, remaining_budget - budget_to_commit), 2)
- 
-    return {
-        "status": status,
-        "funding_year": request["funding_year"],
-        "annual_budget": annual_budget,
-        "used_budget_before": used_budget,
-        "remaining_budget_before": remaining_budget,
-        "total_requested": total_requested,
-        "estimated_eligible_amount": eligible_amount,
-        "budget_to_commit": budget_to_commit,
-        "remaining_budget_after": remaining_after,
-        "lead_days": lead_days,
-        "checks": checks,
-        "issues": issues
-    }
+    def _issue_message(self, excess: float) -> str:
+        return f"Competition prizes exceed the limit by ${excess:.2f}."
+
+    def _fail_message(self, limit: float) -> str:
+        return f"Competition prize limit is ${limit:.2f}."
+
+    def _pass_message(self) -> str:
+        return "No prize-limit problem."
+
+
+#apply all business rules to a request that the ai has already classified
+class LogicManager:
+    def __init__(self, policy: Policy, rules: list[BusinessRule]) -> None:
+        self._policy: Policy = policy
+        self._rules: list[BusinessRule] = list(rules)
+
+    @staticmethod
+    def default_rules() -> list[BusinessRule]:
+        return [RequestLimitRule(), 
+                RemainingBudgetRule(), 
+                LeadTimeRule(),
+                UnclearInformationRule(), 
+                EquipmentQuoteRule(),
+                IneligibleCategoryRule(), 
+                FoodLimitRule(), 
+                PrizeLimitRule()]
+
+    #run every rule on the request and return the assessment (status, checks, issues, amounts)
+    def assess_request(self, request: FundingRequest, ai_result: JsonDict, budget_info: BudgetInfo) -> Assessment:
+        context = RuleContext(request, ai_result, self._policy, budget_info)
+        remaining_budget = budget_info["remaining_budget"]
+
+        #budget info comes from data_manager
+        assessment = Assessment(request.funding_year, budget_info["annual_budget"],
+                                budget_info["used_budget"], remaining_budget,
+                                context.total_requested, context.lead_days)
+
+        eligible_amount = context.total_requested
+        caps: list[float] = [context.total_requested]
+        for rule in self._rules:
+            #skip a rule if the admin turned it off in the policy
+            if not self._policy.is_rule_enabled(rule.rule_id):
+                assessment.add_check(Check.SKIPPED, f"{rule.label} rule is turned off by an admin.")
+                continue
+
+            eligible_amount = eligible_amount - rule.evaluate(context, assessment)
+
+            #collect the limits from rule 1 and 2
+            limit = rule.cap(context)
+            if limit is not None:
+                caps.append(limit)
+
+        eligible_amount = min([eligible_amount] + caps)
+        eligible_amount = round(max(0, eligible_amount), 2)
+
+        #decide the final status and how much budget to commit
+        assessment.finalise(eligible_amount)
+        return assessment
