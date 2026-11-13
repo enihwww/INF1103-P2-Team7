@@ -1,5 +1,15 @@
+from __future__ import annotations
+
 import math
 from datetime import date
+from typing import Any
+
+# A JSON object loaded from or saved to a file.
+JsonDict = dict[str, Any]
+
+# Annual, used and remaining budget of one club for one year.
+BudgetInfo = dict[str, float]
+
 
 # Categories and event types the AI is allowed to return.
 # Kept here so the AI manager and the Policy class share one definition.
@@ -9,6 +19,7 @@ VALID_EVENT_TYPES = {"competition", "workshop", "social",
 VALID_CATEGORIES = {"food", "prize", "reusable_equipment",
     "venue", "transport", "marketing",
     "decoration", "other", "unknown"}
+
 
 # Business rules an admin can switch on or off (id -> label shown to users).
 RULE_NAMES = {
@@ -25,35 +36,37 @@ RULE_NAMES = {
 # This rule sends unclear or failed AI results to a human, so it cannot be turned off.
 LOCKED_RULES = {"unclear_information"}
 
+
 class PolicyError(ValueError):
     """Raised when a policy value is missing or invalid."""
+
 
 class Expense:
     """One expense item inside a funding request."""
 
-    def __init__(self, expense_id, description, amount, quote_available):
+    def __init__(self, expense_id: str, description: str, amount: float, quote_available: bool) -> None:
         self._expense_id = expense_id
         self._description = description
         self._amount = round(float(amount), 2)
         self._quote_available = bool(quote_available)
 
     @property
-    def expense_id(self):
+    def expense_id(self) -> str:
         return self._expense_id
 
     @property
-    def description(self):
+    def description(self) -> str:
         return self._description
 
     @property
-    def amount(self):
+    def amount(self) -> float:
         return self._amount
 
     @property
-    def quote_available(self):
+    def quote_available(self) -> bool:
         return self._quote_available
 
-    def to_dict(self):
+    def to_dict(self) -> JsonDict:
         return {
             "expense_id": self._expense_id,
             "description": self._description,
@@ -62,15 +75,17 @@ class Expense:
         }
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: JsonDict) -> "Expense":
         return cls(data.get("expense_id", ""), data.get("description", ""),
                    data.get("amount", 0), data.get("quote_available", False))
+
 
 class FundingRequest:
     """A club funding request. It owns (composes) its Expense objects."""
 
-    def __init__(self, request_id, club_name, event_title, event_description,
-                 event_date, submission_date, expected_participants, funding_year=None):
+    def __init__(self, request_id: str, club_name: str, event_title: str, event_description: str,
+                 event_date: str, submission_date: str, expected_participants: int,
+                 funding_year: int | None = None) -> None:
         self._request_id = request_id
         self._club_name = club_name
         self._event_title = event_title
@@ -78,7 +93,7 @@ class FundingRequest:
         self._event_date = event_date
         self._submission_date = submission_date
         self._expected_participants = expected_participants
-        self._expenses = []
+        self._expenses: list[Expense] = []
 
         # Use the event year as the funding year (same rule as Phase 1).
         if funding_year is None and event_date:
@@ -86,61 +101,61 @@ class FundingRequest:
         self._funding_year = funding_year
 
     @property
-    def request_id(self):
+    def request_id(self) -> str:
         return self._request_id
 
     @property
-    def club_name(self):
+    def club_name(self) -> str:
         return self._club_name
 
     @property
-    def event_title(self):
+    def event_title(self) -> str:
         return self._event_title
 
     @property
-    def event_description(self):
+    def event_description(self) -> str:
         return self._event_description
 
     @property
-    def event_date(self):
+    def event_date(self) -> str:
         return self._event_date
 
     @property
-    def submission_date(self):
+    def submission_date(self) -> str:
         return self._submission_date
 
     @property
-    def expected_participants(self):
+    def expected_participants(self) -> int:
         return self._expected_participants
 
     @property
-    def funding_year(self):
+    def funding_year(self) -> int | None:
         return self._funding_year
 
     @property
-    def expenses(self):
+    def expenses(self) -> list[Expense]:
         # Return a copy so callers cannot change the list directly.
         return list(self._expenses)
 
-    def add_expense(self, description, amount, quote_available):
+    def add_expense(self, description: str, amount: float, quote_available: bool) -> None:
         """Create the next expense (E1, E2...) inside this request."""
         expense_id = f"E{len(self._expenses) + 1}"
         self._expenses.append(Expense(expense_id, description, amount, quote_available))
 
-    def total_amount(self):
+    def total_amount(self) -> float:
         """Add all expense amounts."""
-        total = 0
+        total = 0.0
         for expense in self._expenses:
             total += expense.amount
         return round(total, 2)
 
-    def lead_days(self):
+    def lead_days(self) -> int:
         """Return the number of days between submission and event."""
         submitted = date.fromisoformat(self._submission_date)
         event = date.fromisoformat(self._event_date)
         return (event - submitted).days
 
-    def to_dict(self):
+    def to_dict(self) -> JsonDict:
         # Same key order as the Phase 1 records in requests.json.
         return {
             "request_id": self._request_id,
@@ -155,7 +170,7 @@ class FundingRequest:
         }
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: JsonDict) -> "FundingRequest":
         request = cls(data.get("request_id", ""), data.get("club_name", ""),
                       data.get("event_title", ""), data.get("event_description", ""),
                       data.get("event_date", ""), data.get("submission_date", ""),
@@ -164,6 +179,7 @@ class FundingRequest:
         for item in data.get("expenses", []):
             request._expenses.append(Expense.from_dict(item))
         return request
+
 
 class Policy:
     """Funding rules. Values are private and can only change through update()."""
@@ -176,9 +192,9 @@ class Policy:
     MONEY_FIELDS = ("max_request_amount", "food_per_person_limit",
                     "max_prize_amount", "equipment_quote_threshold")
 
-    def __init__(self, max_request_amount, minimum_lead_days, food_per_person_limit,
-                 max_prize_amount, equipment_quote_threshold, ineligible_categories,
-                 disabled_rules=None):
+    def __init__(self, max_request_amount: float, minimum_lead_days: int, food_per_person_limit: float,
+                 max_prize_amount: float, equipment_quote_threshold: float, ineligible_categories: list[str],
+                 disabled_rules: list[str] | None = None) -> None:
         values = self._validate({
             "max_request_amount": max_request_amount,
             "minimum_lead_days": minimum_lead_days,
@@ -191,37 +207,37 @@ class Policy:
         self._apply(values)
 
     @property
-    def max_request_amount(self):
+    def max_request_amount(self) -> float:
         return self._max_request_amount
 
     @property
-    def minimum_lead_days(self):
+    def minimum_lead_days(self) -> int:
         return self._minimum_lead_days
 
     @property
-    def food_per_person_limit(self):
+    def food_per_person_limit(self) -> float:
         return self._food_per_person_limit
 
     @property
-    def max_prize_amount(self):
+    def max_prize_amount(self) -> float:
         return self._max_prize_amount
 
     @property
-    def equipment_quote_threshold(self):
+    def equipment_quote_threshold(self) -> float:
         return self._equipment_quote_threshold
 
     @property
-    def ineligible_categories(self):
+    def ineligible_categories(self) -> list[str]:
         return list(self._ineligible_categories)
 
     @property
-    def disabled_rules(self):
+    def disabled_rules(self) -> list[str]:
         return list(self._disabled_rules)
 
-    def is_rule_enabled(self, rule_id):
+    def is_rule_enabled(self, rule_id: str) -> bool:
         return rule_id not in self._disabled_rules
 
-    def update(self, changes):
+    def update(self, changes: JsonDict) -> None:
         """Change policy values. Nothing changes if any value is invalid."""
         unknown = [field for field in changes if field not in self.FIELDS + self.OPTIONAL_FIELDS]
         if unknown:
@@ -231,7 +247,7 @@ class Policy:
         values.update(changes)
         self._apply(self._validate(values))
 
-    def to_dict(self):
+    def to_dict(self) -> JsonDict:
         return {
             "max_request_amount": self._max_request_amount,
             "minimum_lead_days": self._minimum_lead_days,
@@ -243,7 +259,7 @@ class Policy:
         }
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: JsonDict) -> "Policy":
         if not isinstance(data, dict):
             raise PolicyError("policy.json must contain an object.")
 
@@ -251,9 +267,11 @@ class Policy:
             if field not in data:
                 raise PolicyError(f"Policy is missing: {field}")
 
-        return cls(*(data[field] for field in cls.FIELDS), data.get("disabled_rules", []))
+        return cls(data["max_request_amount"], data["minimum_lead_days"], data["food_per_person_limit"],
+                   data["max_prize_amount"], data["equipment_quote_threshold"], data["ineligible_categories"],
+                   data.get("disabled_rules", []))
 
-    def _apply(self, values):
+    def _apply(self, values: JsonDict) -> None:
         self._max_request_amount = values["max_request_amount"]
         self._minimum_lead_days = values["minimum_lead_days"]
         self._food_per_person_limit = values["food_per_person_limit"]
@@ -263,9 +281,9 @@ class Policy:
         self._disabled_rules = list(values["disabled_rules"])
 
     @classmethod
-    def _validate(cls, values):
+    def _validate(cls, values: JsonDict) -> JsonDict:
         """Check every value and return a cleaned copy."""
-        cleaned = {}
+        cleaned: JsonDict = {}
 
         for field in cls.MONEY_FIELDS:
             value = values[field]
@@ -301,6 +319,7 @@ class Policy:
 
         return cleaned
 
+
 class Check:
     """One PASS, FAIL or REVIEW message."""
 
@@ -309,20 +328,21 @@ class Check:
     REVIEW = "REVIEW"
     SKIPPED = "SKIPPED"  # rule turned off by an admin; does not affect the status
 
-    def __init__(self, result, message):
+    def __init__(self, result: str, message: str) -> None:
         self._result = result
         self._message = message
 
     @property
-    def result(self):
+    def result(self) -> str:
         return self._result
 
     @property
-    def message(self):
+    def message(self) -> str:
         return self._message
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, str]:
         return {"result": self._result, "message": self._message}
+
 
 class Assessment:
     """Result of applying the business rules. It owns (composes) its Check objects."""
@@ -331,42 +351,42 @@ class Assessment:
     REVISION = "REVISION_REQUIRED"
     MANUAL = "MANUAL_REVIEW"
 
-    def __init__(self, funding_year, annual_budget, used_budget_before,
-                 remaining_budget_before, total_requested, lead_days):
+    def __init__(self, funding_year: int | None, annual_budget: float, used_budget_before: float,
+                 remaining_budget_before: float, total_requested: float, lead_days: int) -> None:
         self._funding_year = funding_year
         self._annual_budget = annual_budget
         self._used_budget_before = used_budget_before
         self._remaining_budget_before = remaining_budget_before
         self._total_requested = total_requested
         self._lead_days = lead_days
-        self._checks = []
-        self._issues = []
-        self._status = None
+        self._checks: list[Check] = []
+        self._issues: list[str] = []
+        self._status: str | None = None
         self._estimated_eligible_amount = 0.0
         self._budget_to_commit = 0.0
         self._remaining_budget_after = remaining_budget_before
 
-    def add_check(self, result, message):
+    def add_check(self, result: str, message: str) -> None:
         self._checks.append(Check(result, message))
 
-    def add_issue(self, issue):
+    def add_issue(self, issue: str) -> None:
         self._issues.append(issue)
 
-    def has_result(self, result):
+    def has_result(self, result: str) -> bool:
         """Return True if any check has this result."""
         for check in self._checks:
             if check.result == result:
                 return True
         return False
 
-    def decide_status(self):
+    def decide_status(self) -> str:
         if self.has_result(Check.REVIEW):
             return self.MANUAL
         if self.has_result(Check.FAIL):
             return self.REVISION
         return self.READY
 
-    def finalise(self, eligible_amount):
+    def finalise(self, eligible_amount: float) -> None:
         """Set the status and the amount to take from the annual budget."""
         self._estimated_eligible_amount = eligible_amount
         self._status = self.decide_status()
@@ -381,54 +401,54 @@ class Assessment:
             max(0, self._remaining_budget_before - self._budget_to_commit), 2)
 
     @property
-    def status(self):
+    def status(self) -> str | None:
         return self._status
 
     @property
-    def funding_year(self):
+    def funding_year(self) -> int | None:
         return self._funding_year
 
     @property
-    def annual_budget(self):
+    def annual_budget(self) -> float:
         return self._annual_budget
 
     @property
-    def used_budget_before(self):
+    def used_budget_before(self) -> float:
         return self._used_budget_before
 
     @property
-    def remaining_budget_before(self):
+    def remaining_budget_before(self) -> float:
         return self._remaining_budget_before
 
     @property
-    def total_requested(self):
+    def total_requested(self) -> float:
         return self._total_requested
 
     @property
-    def estimated_eligible_amount(self):
+    def estimated_eligible_amount(self) -> float:
         return self._estimated_eligible_amount
 
     @property
-    def budget_to_commit(self):
+    def budget_to_commit(self) -> float:
         return self._budget_to_commit
 
     @property
-    def remaining_budget_after(self):
+    def remaining_budget_after(self) -> float:
         return self._remaining_budget_after
 
     @property
-    def lead_days(self):
+    def lead_days(self) -> int:
         return self._lead_days
 
     @property
-    def checks(self):
+    def checks(self) -> list[Check]:
         return list(self._checks)
 
     @property
-    def issues(self):
+    def issues(self) -> list[str]:
         return list(self._issues)
 
-    def to_dict(self):
+    def to_dict(self) -> JsonDict:
         # Same key order as the Phase 1 assessment dictionary.
         return {
             "status": self._status,
@@ -446,7 +466,7 @@ class Assessment:
         }
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: JsonDict) -> "Assessment":
         assessment = cls(data.get("funding_year"), data.get("annual_budget", 0.0),
                          data.get("used_budget_before", 0.0),
                          data.get("remaining_budget_before", 0.0),
@@ -463,14 +483,16 @@ class Assessment:
         assessment._remaining_budget_after = data.get("remaining_budget_after", 0.0)
         return assessment
 
+
 class FundingRecord:
     """A saved request together with its AI result and assessment."""
 
     PROCESSED = "PROCESSED"
     AI_FAILED = "AI_FAILED"
 
-    def __init__(self, request, ai_result, assessment, processing_status,
-                 processing_error=None, budget_committed=False, budget_amount=0.0):
+    def __init__(self, request: FundingRequest, ai_result: JsonDict | None, assessment: Assessment | None,
+                 processing_status: str, processing_error: str | None = None,
+                 budget_committed: bool = False, budget_amount: float = 0.0) -> None:
         self._request = request
         self._ai_result = ai_result
         self._assessment = assessment
@@ -480,46 +502,46 @@ class FundingRecord:
         self._budget_amount = budget_amount
 
     @property
-    def request(self):
+    def request(self) -> FundingRequest:
         return self._request
 
     @property
-    def request_id(self):
+    def request_id(self) -> str:
         return self._request.request_id
 
     @property
-    def club_name(self):
+    def club_name(self) -> str:
         return self._request.club_name
 
     @property
-    def funding_year(self):
+    def funding_year(self) -> int | None:
         return self._request.funding_year
 
     @property
-    def ai_result(self):
+    def ai_result(self) -> JsonDict | None:
         return self._ai_result
 
     @property
-    def assessment(self):
+    def assessment(self) -> Assessment | None:
         return self._assessment
 
     @property
-    def processing_status(self):
+    def processing_status(self) -> str:
         return self._processing_status
 
     @property
-    def processing_error(self):
+    def processing_error(self) -> str | None:
         return self._processing_error
 
     @property
-    def budget_committed(self):
+    def budget_committed(self) -> bool:
         return self._budget_committed
 
     @property
-    def budget_amount(self):
+    def budget_amount(self) -> float:
         return self._budget_amount
 
-    def to_dict(self):
+    def to_dict(self) -> JsonDict:
         record = self._request.to_dict()
         record["ai_result"] = self._ai_result
         record["assessment"] = self._assessment.to_dict() if self._assessment else None
@@ -530,7 +552,7 @@ class FundingRecord:
         return record
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: JsonDict) -> "FundingRecord":
         assessment_data = data.get("assessment")
         assessment = Assessment.from_dict(assessment_data) if assessment_data else None
 
