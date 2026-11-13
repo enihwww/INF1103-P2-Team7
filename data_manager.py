@@ -1,5 +1,11 @@
+from __future__ import annotations
+
 import json
 import os
+from abc import ABC, abstractmethod
+from typing import Any
+
+from models import FundingRecord, Policy, PolicyError
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -8,6 +14,114 @@ REQUESTS_FILE = os.path.join(DATA_DIR, "requests.json")
 POLICY_FILE = os.path.join(DATA_DIR, "policy.json")
 BUDGETS_FILE = os.path.join(DATA_DIR, "club_budgets.json")
 EXCEL_FILE = os.path.join(DATA_DIR, "ClubFund_Report.xlsx")
+
+# Interface for loading and saving one kind of data
+class Repository(ABC):
+
+    @abstractmethod
+    def load(self) -> tuple[Any, str | None]:
+        """Return (data, error_message)."""
+
+    @abstractmethod
+    def save(self, data: Any) -> tuple[bool, str | None]:
+        """Return (success, error_message)."""
+
+# Saves and loads request records in requests.json
+class JsonRequestRepository(Repository):
+
+    def __init__(self, file_path: str) -> None:
+        self._file_path = file_path
+
+    def load(self) -> tuple[list[FundingRecord], str | None]:
+        if not os.path.exists(self._file_path):
+            return [], None
+
+        try:
+            with open(self._file_path, "r", encoding="utf-8") as file:
+                records = json.load(file)
+
+            if not isinstance(records, list):
+                return [], "requests.json must contain a list."
+
+            return [FundingRecord.from_dict(record) for record in records], None
+
+        except (OSError, json.JSONDecodeError) as error:
+            return [], f"Could not load requests: {error}"
+
+        except (AttributeError, TypeError, ValueError) as error:
+            return [], f"Could not load requests: a saved record is corrupt ({error})."
+
+    def save(self, records: list[FundingRecord]) -> tuple[bool, str | None]:
+        try:
+            os.makedirs(os.path.dirname(self._file_path), exist_ok=True)
+
+            with open(self._file_path, "w", encoding="utf-8") as file:
+                json.dump([record.to_dict() for record in records], file, indent=2)
+
+            return True, None
+
+        except OSError as error:
+            return False, f"Could not save requests: {error}"
+
+# Saves and loads the funding policy in policy.json
+class JsonPolicyRepository(Repository):
+
+    def __init__(self, file_path: str) -> None:
+        self._file_path = file_path
+
+    def load(self) -> tuple[Policy | None, str | None]:
+        try:
+            with open(self._file_path, "r", encoding="utf-8") as file:
+                return Policy.from_dict(json.load(file)), None
+
+        except FileNotFoundError:
+            return None, "policy.json was not found."
+
+        except (OSError, json.JSONDecodeError) as error:
+            return None, f"Could not load policy: {error}"
+
+        except PolicyError as error:
+            return None, str(error)
+
+    def save(self, policy: Policy) -> tuple[bool, str | None]:
+        try:
+            with open(self._file_path, "w", encoding="utf-8") as file:
+                json.dump(policy.to_dict(), file, indent=2)
+
+            return True, None
+
+        except OSError as error:
+            return False, f"Could not save policy: {error}"
+
+# Loads the fixed annual allocation for each club (read only)
+class JsonBudgetRepository:
+
+    def __init__(self, file_path: str) -> None:
+        self._file_path = file_path
+
+    def load(self) -> tuple[dict[str, float] | None, str | None]:
+        try:
+            with open(self._file_path, "r", encoding="utf-8") as file:
+                budgets = json.load(file)
+
+            if not isinstance(budgets, dict) or not budgets:
+                return None, "club_budgets.json must contain club budgets."
+
+            for club, amount in budgets.items():
+                if not isinstance(club, str):
+                    return None, "Club names in club_budgets.json must be text."
+
+                if not isinstance(amount, (int, float)) or amount < 0:
+                    return None, f"Invalid annual budget for {club}."
+
+            return budgets, None
+
+        except FileNotFoundError:
+            return None, "club_budgets.json was not found."
+
+        except (OSError, json.JSONDecodeError) as error:
+            return None, f"Could not load club budgets: {error}"
+
 
 def load_requests():
     """Load saved requests."""
