@@ -1,4 +1,5 @@
-from models import BudgetInfo, Expense, FundingRequest, JsonDict, Policy
+from models import BudgetInfo, Expense, FundingRequest, JsonDict, Policy, Assessment, RULE_NAMES
+from abc import ABC, abstractmethod
 
 #holds the values every rule needs while one request is being checked
 #so each rule does not have to work them out again
@@ -37,4 +38,21 @@ class RuleContext:
                 total += expense.amount
         return round(total, 2)
 
+#abstract class for one business rule
+class BusinessRule(ABC):
+    #each child class sets its own id (e.g. "food_limit"), used to turn rules on or off
+    rule_id: str = ""
+
+    #check the request and add PASS, FAIL or REVIEW messages to the assessment
+    @abstractmethod
+    def evaluate(self, context: RuleContext, assessment: Assessment) -> float:
+        pass
+
+    def cap(self, context: RuleContext) -> float | None:
+        return None
+
+    #the rule name shown to the user
+    @property
+    def label(self) -> str:
+        return RULE_NAMES.get(self.rule_id, type(self).__name__)
 
