@@ -1,0 +1,14 @@
+#this folder is the logic manager, with one class in each file
+#importing the classes here lets other files keep writing: from logic_manager import LogicManager
+from logic_manager.rule_context import RuleContext
+from logic_manager.business_rule import BusinessRule
+from logic_manager.request_limit_rule import RequestLimitRule
+from logic_manager.remaining_budget_rule import RemainingBudgetRule
+from logic_manager.lead_time_rule import LeadTimeRule
+from logic_manager.unclear_information_rule import UnclearInformationRule
+from logic_manager.equipment_quote_rule import EquipmentQuoteRule
+from logic_manager.ineligible_category_rule import IneligibleCategoryRule
+from logic_manager.category_limit_rule import CategoryLimitRule
+from logic_manager.food_limit_rule import FoodLimitRule
+from logic_manager.prize_limit_rule import PrizeLimitRule
+from logic_manager.logic_manager import LogicManager
