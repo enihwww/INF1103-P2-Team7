@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %} · Summary{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Summary</div>
+    <div class="page-subtitle">Totals across all saved requests.</div>
+  </div>
+  <form method="post" action="{{ url_for('export') }}">
+    <button type="submit" class="btn btn-primary">Export Excel report</button>
+  </form>
+</div>
+<div class="stats">
+  <div class="stat"><div class="stat-label">Total requests</div><div class="stat-value">{{ summary.total_requests }}</div>
+    <div class="stat-note">AI failed: {{ summary.ai_failed }}</div></div>
+  <div class="stat"><div class="stat-label">Ready for review</div><div class="stat-value" style="color:var(--info)">{{ summary.ready_for_review }}</div>
+    <div class="stat-note">Budget reserved</div></div>
+  <div class="stat"><div class="stat-label">Revision required</div><div class="stat-value red">{{ summary.revision_required }}</div>
+    <div class="stat-note">Breaks a policy rule</div></div>
+  <div class="stat"><div class="stat-label">Manual review</div><div class="stat-value amber">{{ summary.manual_review }}</div>
+    <div class="stat-note">Needs a human check</div></div>
+</div>
+<div class="stats">
+  <div class="stat"><div class="stat-label">Total requested</div><div class="stat-value">${{ '%.2f'|format(summary.total_requested) }}</div></div>
+  <div class="stat"><div class="stat-label">Estimated eligible</div><div class="stat-value">${{ '%.2f'|format(summary.estimated_eligible) }}</div></div>
+  <div class="stat"><div class="stat-label">Budget committed</div><div class="stat-value red">${{ '%.2f'|format(summary.budget_committed) }}</div></div>
+</div>
+<p class="muted">Export saves data/ClubFund_Report.xlsx (Dashboard, Requests, Expenses, Annual Budgets) and downloads a copy.</p>
+{% endblock %}

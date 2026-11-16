@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %} · New request{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">New Funding Request</div>
+    <div class="page-subtitle">Submit event details and itemised expenses for automated policy pre-screening.</div>
+  </div>
+</div>
+{% for error in errors %}
+<div class="flash error">{{ error }}</div>
+{% endfor %}
+<form method="post" id="request-form" class="card">
+  <div class="field">
+    <label>Submitting Club</label>
+    <input type="text" value="{{ form.club_name }}" disabled>
+  </div>
+  <div class="field">
+    <label for="event_title">Event Title</label>
+    <input type="text" id="event_title" name="event_title" value="{{ form.event_title }}" placeholder="e.g. Intro to Robotics Workshop">
+  </div>
+  <div class="field">
+    <label for="event_description">Event Description</label>
+    <textarea id="event_description" name="event_description" placeholder="What is the event, who is it for and what will happen?">{{ form.event_description }}</textarea>
+  </div>
+  <div class="grid-3">
+    <div class="field">
+      <label for="event_date">Event Date</label>
+      <input type="date" id="event_date" name="event_date" value="{{ form.event_date }}">
+    </div>
+    <div class="field">
+      <label for="submission_date">Submission Date</label>
+      <input type="date" id="submission_date" name="submission_date" value="{{ form.submission_date }}">
+    </div>
+    <div class="field">
+      <label for="expected_participants">Expected Participants</label>
+      <input type="number" min="1" step="1" id="expected_participants" name="expected_participants" value="{{ form.expected_participants }}">
+    </div>
+  </div>
+
+  <div class="card-header" style="margin:12px 0 10px">
+    <div class="card-title" style="font-size:14px">Expense Breakdown</div>
+    <span class="muted">The AI assigns each expense a category; the funding rules are applied in Python.</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:60px">ID</th><th>Description</th><th style="width:170px">Amount ($)</th>
+        <th style="width:140px; text-align:center">Supplier Quote?</th><th style="width:80px; text-align:center">Action</th></tr></thead>
+      <tbody id="expenses">
+        {% for row in form.expenses %}
+        <tr class="expense-row">
+          <td class="eid"><b>E{{ loop.index }}</b></td>
+          <td><input type="text" name="description_{{ loop.index }}" value="{{ row.description }}" placeholder="e.g. Lunch for participants"></td>
+          <td><input type="number" min="0" step="0.01" name="amount_{{ loop.index }}" value="{{ row.amount }}" class="amount"></td>
+          <td style="text-align:center"><input type="checkbox" name="quote_{{ loop.index }}" value="yes" {% if row.quote %}checked{% endif %}></td>
+          <td style="text-align:center"><button type="button" class="btn btn-danger remove">X</button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-header" style="margin-top:12px">
+    <button type="button" class="btn btn-sm" id="add-expense">+ Add Expense Item</button>
+    <div style="font-size:15px; font-weight:600">Total Requested: <span class="red" id="total">$0.00</span></div>
+  </div>
+
+  <div class="actions">
+    <span class="muted" id="processing" hidden>Processing with AI, this can take a few seconds...</span>
+    <button type="submit" class="btn btn-primary" id="submit-button">Submit &amp; Run Screening</button>
+  </div>
+</form>
+
+<script>
+  // Expense rows: add, remove, renumber (E1, E2, ...) and show the running total.
+  const body = document.getElementById("expenses");
+  function renumber() {
+    body.querySelectorAll(".expense-row").forEach((row, i) => {
+      const n = i + 1;
+      row.querySelector(".eid").innerHTML = "<b>E" + n + "</b>";
+      row.querySelectorAll("input").forEach(input => { input.name = input.name.replace(/_\d+$/, "_" + n); });
+    });
+    updateTotal();
+  }
+  function updateTotal() {
+    let total = 0;
+    body.querySelectorAll(".amount").forEach(input => { total += parseFloat(input.value) || 0; });
+    document.getElementById("total").textContent = "$" + total.toFixed(2);
+  }
+  document.getElementById("add-expense").onclick = () => {
+    const rows = body.querySelectorAll(".expense-row");
+    if (rows.length >= 20) return;
+    const row = rows[rows.length - 1].cloneNode(true);
+    row.querySelectorAll("input").forEach(input => {
+      if (input.type === "checkbox") { input.checked = false; } else { input.value = ""; }
+    });
+    body.appendChild(row);
+    renumber();
+  };
+  body.addEventListener("click", event => {
+    if (!event.target.classList.contains("remove")) return;
+    if (body.querySelectorAll(".expense-row").length > 1) { event.target.closest("tr").remove(); renumber(); }
+  });
+  body.addEventListener("input", updateTotal);
+  updateTotal();
+  // Stop double submits while the AI is working.
+  document.getElementById("request-form").onsubmit = () => {
+    document.getElementById("submit-button").disabled = true;
+    document.getElementById("processing").hidden = false;
+  };
+</script>
+{% endblock %}

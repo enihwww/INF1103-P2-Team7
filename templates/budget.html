@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %} · Club budget{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Club Annual Budget</div>
+    <div class="page-subtitle">Check how much of a club's yearly allocation is committed.</div>
+  </div>
+</div>
+<div class="card">
+  <form method="get" class="grid-3" style="align-items:end">
+    <div class="field">
+      <label for="club">Club</label>
+      <select id="club" name="club">
+        {% for name in clubs %}
+        <option value="{{ name }}" {% if name == club %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="year">Funding year</label>
+      <input type="text" id="year" name="year" value="{{ year }}" placeholder="e.g. 2026">
+    </div>
+    <div class="field"><button type="submit" class="btn btn-primary">Show budget</button></div>
+  </form>
+</div>
+{% if budget_info %}
+<div class="stats">
+  <div class="stat"><div class="stat-label">Annual budget ({{ year }})</div>
+    <div class="stat-value">${{ '%.2f'|format(budget_info.annual_budget) }}</div><div class="stat-note">{{ club }}</div></div>
+  <div class="stat"><div class="stat-label">Used/committed</div>
+    <div class="stat-value red">${{ '%.2f'|format(budget_info.used_budget) }}</div><div class="stat-note">Ready-for-review requests</div></div>
+  <div class="stat"><div class="stat-label">Remaining</div>
+    <div class="stat-value green">${{ '%.2f'|format(budget_info.remaining_budget) }}</div><div class="stat-note">Available for new requests</div></div>
+</div>
+{% endif %}
+{% endblock %}

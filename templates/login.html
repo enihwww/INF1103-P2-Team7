@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %} · Log in{% endblock %}
+{% block content %}
+<div class="card login">
+  <div class="login-head">
+    <div class="page-title">Welcome to ClubFund</div>
+    <p class="page-subtitle">AI-assisted pre-screening of club funding requests. Choose how you want to continue.</p>
+  </div>
+  <div class="roles">
+    <form method="post" class="role-card">
+      <div class="card-title">Student</div>
+      <p class="muted">Submit requests and see your club's budget and requests.</p>
+      <div>
+        <label for="club">Your club</label>
+        <select id="club" name="club">
+          <option value="">Select club</option>
+          {% for club in clubs %}<option value="{{ club }}">{{ club }}</option>{% endfor %}
+        </select>
+      </div>
+      <button type="submit" name="role" value="student" class="btn">Continue as Student</button>
+    </form>
+    <form method="post" class="role-card">
+      <div class="card-title">Admin</div>
+      <p class="muted">Review all clubs' requests, budgets, the summary report and the funding policy.</p>
+      <div>
+        <label for="password">Admin password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password">
+      </div>
+      <button type="submit" name="role" value="admin" class="btn btn-primary">Continue as Admin</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %} · Funding policy{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Funding Policy</div>
+    <div class="page-subtitle">Changes are saved to data/policy.json and apply to new requests. Saved results are not recalculated.</div>
+  </div>
+</div>
+<form method="post">
+  <div class="card">
+    <div class="card-title" style="margin-bottom:14px">Limits</div>
+    <div class="grid-2">
+      <div class="field">
+        <label for="max_request_amount">Max request amount ($)</label>
+        <input type="number" min="0" step="0.01" id="max_request_amount" name="max_request_amount" value="{{ '%.2f'|format(policy.max_request_amount) }}">
+      </div>
+      <div class="field">
+        <label for="minimum_lead_days">Minimum lead days</label>
+        <input type="number" min="0" step="1" id="minimum_lead_days" name="minimum_lead_days" value="{{ policy.minimum_lead_days }}">
+      </div>
+      <div class="field">
+        <label for="food_per_person_limit">Food limit per person ($)</label>
+        <input type="number" min="0" step="0.01" id="food_per_person_limit" name="food_per_person_limit" value="{{ '%.2f'|format(policy.food_per_person_limit) }}">
+      </div>
+      <div class="field">
+        <label for="max_prize_amount">Max prize amount for competitions ($)</label>
+        <input type="number" min="0" step="0.01" id="max_prize_amount" name="max_prize_amount" value="{{ '%.2f'|format(policy.max_prize_amount) }}">
+      </div>
+      <div class="field">
+        <label for="equipment_quote_threshold">Equipment quote threshold ($)</label>
+        <input type="number" min="0" step="0.01" id="equipment_quote_threshold" name="equipment_quote_threshold" value="{{ '%.2f'|format(policy.equipment_quote_threshold) }}">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:12px">Ineligible expense categories</div>
+    <div class="checkbox-list">
+      {% for category in categories %}
+      <label><input type="checkbox" name="ineligible_categories" value="{{ category }}"
+             {% if category in policy.ineligible_categories %}checked{% endif %}> {{ category }}</label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Active rules</div>
+    <p class="muted" style="margin:4px 0 12px">Untick a rule to turn it off. Turned-off rules are skipped and shown as SKIPPED in new results.</p>
+    <input type="hidden" name="rules_form" value="1">
+    <div class="checkbox-list rules">
+      {% for rule_id, rule_label in rules.items() %}
+      <label><input type="checkbox" name="enabled_rules" value="{{ rule_id }}"
+             {% if policy.is_rule_enabled(rule_id) %}checked{% endif %}
+             {% if rule_id in locked %}disabled{% endif %}> {{ rule_label }}{% if rule_id in locked %} <span class="muted">(always on)</span>{% endif %}</label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="actions"><button type="submit" class="btn btn-primary">Save Policy</button></div>
+</form>
+{% endblock %}

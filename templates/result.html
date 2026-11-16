@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %} · {{ record.request_id }}{% endblock %}
+{% block content %}
+{% set assessment = record.assessment %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Funding Assessment · {{ record.request_id }}</div>
+    <div class="page-subtitle">{{ record.club_name }} · {{ record.request.event_title }}</div>
+  </div>
+  {% if assessment %}<span class="badge {{ assessment.status }}" style="font-size:13px">{{ assessment.status }}</span>{% endif %}
+</div>
+{% if not assessment %}
+<div class="card"><p>This request has no completed assessment.</p></div>
+{% else %}
+{% if ai_failed %}
+<div class="flash warning">AI status: UNAVAILABLE – AI-dependent categories were not classified. This request requires manual review.</div>
+{% endif %}
+<div class="stats">
+  <div class="stat"><div class="stat-label">Requested</div>
+    <div class="stat-value">${{ '%.2f'|format(assessment.total_requested) }}</div>
+    <div class="stat-note">Funding year {{ assessment.funding_year }}</div></div>
+  <div class="stat"><div class="stat-label">{{ 'Provisional eligible amount' if ai_failed else 'Estimated eligible' }}</div>
+    <div class="stat-value red">${{ '%.2f'|format(assessment.estimated_eligible_amount) }}</div>
+    <div class="stat-note">After policy rules</div></div>
+  <div class="stat"><div class="stat-label">Budget deducted/reserved</div>
+    <div class="stat-value">${{ '%.2f'|format(record.budget_amount if record.budget_committed else 0) }}</div>
+    <div class="stat-note">Budget remaining: ${{ '%.2f'|format(assessment.remaining_budget_after if record.budget_committed else assessment.remaining_budget_before) }}</div></div>
+</div>
+<div class="card">
+  <div class="card-title" style="margin-bottom:12px">Annual budget</div>
+  <div class="table-wrap"><table class="kv">
+    <tr><th>Allocated</th><td class="num">${{ '%.2f'|format(assessment.annual_budget) }}</td></tr>
+    <tr><th>Previously committed</th><td class="num">${{ '%.2f'|format(assessment.used_budget_before) }}</td></tr>
+    <tr><th>Available before request</th><td class="num">${{ '%.2f'|format(assessment.remaining_budget_before) }}</td></tr>
+  </table></div>
+</div>
+<div class="card">
+  <div class="card-title" style="margin-bottom:12px">Checks</div>
+  <div class="table-wrap"><table>
+    {% for check in assessment.checks %}
+    <tr><td style="width:110px"><span class="badge {{ check.result }}">{{ check.result }}</span></td><td>{{ check.message }}</td></tr>
+    {% endfor %}
+  </table></div>
+  {% if assessment.issues %}
+  <div class="card-title" style="margin:18px 0 8px">Issues</div>
+  <ul class="issues">{% for issue in assessment.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+  {% endif %}
+  <p class="muted" style="margin-top:14px">This is a pre-screening result, not final funding approval.</p>
+</div>
+{% endif %}
+{% endblock %}

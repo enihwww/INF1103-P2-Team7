@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ClubFund{% block title %}{% endblock %}</title>
+  <style>
+    :root {
+      --primary: #8b0000; --primary-hover: #700000; --primary-light: #fbebeb;
+      --bg: #f4f6f9; --surface: #ffffff; --text: #222222; --text-muted: #666666;
+      --border: #e2e8f0; --border-dark: #cbd5e1;
+      --success: #15803d; --success-bg: #dcfce7; --warning: #b45309; --warning-bg: #fef3c7;
+      --danger: #b91c1c; --danger-bg: #fee2e2; --info: #0369a1; --info-bg: #e0f2fe;
+      --radius: 8px;
+      --shadow: 0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -2px rgba(0,0,0,.05);
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; font-size: 14px; }
+    a { color: var(--primary); }
+
+    /* App shell */
+    .top-bar { background: var(--surface); border-bottom: 1px solid var(--border); height: 60px;
+      display: flex; align-items: center; justify-content: space-between; padding: 0 24px;
+      position: sticky; top: 0; z-index: 10; }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .brand-name { font-size: 19px; font-weight: 700; color: var(--primary); }
+    .brand-tag { background: var(--primary-light); color: var(--primary); font-size: 11px; font-weight: 600;
+      padding: 3px 8px; border-radius: 4px; letter-spacing: .3px; }
+    .top-right { display: flex; align-items: center; gap: 16px; }
+    .ai-pill { display: flex; align-items: center; gap: 8px; background: #f8fafc; border: 1px solid var(--border);
+      border-radius: 6px; padding: 6px 12px; font-size: 13px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
+    .dot.off { background: #f59e0b; }
+
+    .layout { display: flex; min-height: calc(100vh - 60px); }
+    .sidebar { width: 240px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px 12px; flex-shrink: 0; }
+    .nav-header { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: .6px; padding: 0 12px 10px; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 4px;
+      border-radius: 6px; color: var(--text); text-decoration: none; font-size: 14px; font-weight: 500; }
+    .nav-item:hover { background: #f8fafc; }
+    .nav-item.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+    .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+    .main { flex: 1; padding: 28px 36px; min-width: 0; }
+    .content { max-width: 1100px; margin: 0 auto; }
+
+    /* Page content */
+    .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; gap: 16px; }
+    .page-title { font-size: 22px; font-weight: 700; color: #111827; }
+    .page-subtitle { color: var(--text-muted); margin-top: 4px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: var(--shadow); padding: 20px; margin-bottom: 20px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .card-title { font-size: 16px; font-weight: 600; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; }
+    .stat-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+    .stat-value { font-size: 26px; font-weight: 700; margin: 6px 0 4px; }
+    .stat-note { font-size: 13px; color: var(--text-muted); }
+    .red { color: var(--primary); } .green { color: var(--success); } .amber { color: var(--warning); }
+
+    .table-wrap { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f8fafc; text-align: left; font-weight: 600; color: #475569; font-size: 13px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+    td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: 0; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .kv th { width: 40%; background: #f8fafc; }
+
+    .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; letter-spacing: .3px; }
+    .READY_FOR_REVIEW, .PASS { background: var(--info-bg); color: var(--info); }
+    .PASS { background: var(--success-bg); color: var(--success); }
+    .REVISION_REQUIRED, .FAIL { background: var(--danger-bg); color: var(--danger); }
+    .MANUAL_REVIEW, .REVIEW, .AI_FAILED { background: var(--warning-bg); color: var(--warning); }
+    .SKIPPED, .PROCESSED { background: #f1f5f9; color: #64748b; }
+
+    label { display: block; font-weight: 600; font-size: 13px; color: #334155; margin-bottom: 6px; }
+    .field { margin-bottom: 16px; }
+    input[type=text], input[type=number], input[type=date], input[type=password], select, textarea {
+      width: 100%; padding: 9px 12px; border: 1px solid var(--border-dark); border-radius: 6px; font: inherit; background: #fff; }
+    input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-light); border-color: var(--primary); }
+    textarea { min-height: 70px; resize: vertical; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 16px; }
+
+    .btn { display: inline-block; border: 1px solid var(--border-dark); background: #fff; color: var(--text);
+      padding: 9px 16px; border-radius: 6px; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
+    .btn:hover { background: #f8fafc; }
+    .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+    .btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; padding: 3px 10px; font-size: 12px; }
+    .btn-danger:hover { background: #991b1b; }
+    .btn:disabled { opacity: .6; cursor: wait; }
+    .actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 20px; }
+
+    .flash { padding: 12px 16px; border-radius: 6px; margin-bottom: 18px; border: 1px solid; font-weight: 500; }
+    .flash.success { background: var(--success-bg); border-color: #86efac; color: #14532d; }
+    .flash.error { background: var(--danger-bg); border-color: #fca5a5; color: #7f1d1d; }
+    .flash.warning { background: var(--warning-bg); border-color: #fcd34d; color: #78350f; }
+    .muted { color: var(--text-muted); font-size: 13px; }
+    .checkbox-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .checkbox-list.rules { grid-template-columns: repeat(2, 1fr); }
+    .checkbox-list label { font-weight: 500; display: flex; gap: 8px; align-items: center; margin: 0; }
+    ul.issues { padding-left: 20px; }
+
+    .login { max-width: 640px; margin: 60px auto; }
+    .login-head { text-align: center; margin-bottom: 20px; }
+    .login .roles { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .login .role-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+    .login .role-card .btn { margin-top: auto; padding: 12px; }
+    .club-chip { background: var(--primary-light); color: var(--primary); font-weight: 600; font-size: 13px; padding: 6px 12px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+<header class="top-bar">
+  <a class="brand" href="{{ url_for('requests') if role else url_for('login') }}">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b0000" stroke-width="2" stroke-linejoin="round"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="m2 13 10 5 10-5"/><path d="m2 17.5 10 5 10-5"/></svg>
+    <span class="brand-name">ClubFund</span><span class="brand-tag">SIT FINANCE PORTAL</span>
+  </a>
+  <div class="top-right">
+    <div class="ai-pill"><span class="dot {{ '' if ai_key_set else 'off' }}"></span>
+      AI Service: {{ 'API key set' if ai_key_set else 'No API key (fallback)' }}</div>
+    {% if role %}
+    {% if my_club %}<span class="club-chip">{{ my_club }}</span>{% endif %}
+    {% if role == 'admin' %}<span class="club-chip">Admin</span>{% endif %}
+    {# Log out returns to the log-in page (students pick a club, admins enter the password). #}
+    <a class="btn btn-sm" href="{{ url_for('logout') }}">Log out</a>
+    {% endif %}
+  </div>
+</header>
+
+<div class="layout">
+  {% if role %}
+  {% set page = request.endpoint %}
+  <aside class="sidebar">
+    <div class="nav-header">NAVIGATION</div>
+    {% if role == 'student' %}
+    <a class="nav-item {{ 'active' if page in ('requests', 'result') }}" href="{{ url_for('requests') }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><path d="M14 17h6M17 14v6"/></svg>My Club Overview</a>
+    <a class="nav-item {{ 'active' if page == 'new_request' }}" href="{{ url_for('new_request') }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New Funding Request</a>
+    {% else %}
+    <a class="nav-item {{ 'active' if page in ('requests', 'result') }}" href="{{ url_for('requests') }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/></svg>All Requests</a>
+    <a class="nav-item {{ 'active' if page == 'budget' }}" href="{{ url_for('budget') }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c0-1.4-1.3-2.5-3-2.5s-3 1-3 2.3c0 3.2 6 1.7 6 4.9 0 1.3-1.3 2.3-3 2.3s-3-1.1-3-2.5M12 5.5V7m0 10v1.5"/></svg>Club Budget</a>
+    <a class="nav-item {{ 'active' if page == 'summary' }}" href="{{ url_for('summary') }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>Summary &amp; Excel</a>
+    <a class="nav-item {{ 'active' if page == 'policy' }}" href="{{ url_for('policy') }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Funding Policy</a>
+    {% endif %}
+  </aside>
+  {% endif %}
+  <main class="main">
+    <div class="content">
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+    <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+    </div>
+  </main>
+</div>
+</body>
+</html>
