@@ -1,0 +1,277 @@
+[
+  {
+    "name": "Valid funding request",
+    "request": {
+      "request_id": "TEST001",
+      "club_name": "Computing Club",
+      "event_title": "Student Tech Competition",
+      "event_description": "A student technology competition with refreshments and prizes.",
+      "event_date": "2026-11-20",
+      "submission_date": "2026-11-01",
+      "expected_participants": 40,
+      "funding_year": 2026,
+      "expenses": [
+        {
+          "expense_id": "E1",
+          "description": "Food for participants",
+          "amount": 100.0,
+          "quote_available": false
+        },
+        {
+          "expense_id": "E2",
+          "description": "Gift vouchers for winners",
+          "amount": 150.0,
+          "quote_available": false
+        }
+      ]
+    },
+    "ai_result": {
+      "event_type": "competition",
+      "event_purpose": "Student technology competition.",
+      "expenses": [
+        {
+          "expense_id": "E1",
+          "category": "food",
+          "purpose": "Participant refreshments.",
+          "ambiguous": false
+        },
+        {
+          "expense_id": "E2",
+          "category": "prize",
+          "purpose": "Competition prizes.",
+          "ambiguous": false
+        }
+      ],
+      "missing_information": []
+    },
+    "existing_records": [],
+    "expected": {
+      "status": "READY_FOR_REVIEW",
+      "total_requested": 250.0,
+      "estimated_eligible_amount": 250.0,
+      "budget_to_commit": 250.0
+    }
+  },
+  {
+    "name": "Prize limit exceeded",
+    "request": {
+      "request_id": "TEST002",
+      "club_name": "Computing Club",
+      "event_title": "Student Tech Competition",
+      "event_description": "A student technology competition with refreshments and prizes.",
+      "event_date": "2026-11-20",
+      "submission_date": "2026-11-01",
+      "expected_participants": 40,
+      "funding_year": 2026,
+      "expenses": [
+        {
+          "expense_id": "E1",
+          "description": "Food for participants",
+          "amount": 100.0,
+          "quote_available": false
+        },
+        {
+          "expense_id": "E2",
+          "description": "Gift vouchers for winners",
+          "amount": 300.0,
+          "quote_available": false
+        }
+      ]
+    },
+    "ai_result": {
+      "event_type": "competition",
+      "event_purpose": "Student technology competition.",
+      "expenses": [
+        {
+          "expense_id": "E1",
+          "category": "food",
+          "purpose": "Participant refreshments.",
+          "ambiguous": false
+        },
+        {
+          "expense_id": "E2",
+          "category": "prize",
+          "purpose": "Competition prizes.",
+          "ambiguous": false
+        }
+      ],
+      "missing_information": []
+    },
+    "existing_records": [],
+    "expected": {
+      "status": "REVISION_REQUIRED",
+      "total_requested": 400.0,
+      "estimated_eligible_amount": 300.0,
+      "budget_to_commit": 0.0
+    }
+  },
+  {
+    "name": "Annual budget exceeded",
+    "request": {
+      "request_id": "TEST003",
+      "club_name": "Computing Club",
+      "event_title": "Student Tech Competition",
+      "event_description": "A student technology competition with refreshments and prizes.",
+      "event_date": "2026-11-20",
+      "submission_date": "2026-11-01",
+      "expected_participants": 40,
+      "funding_year": 2026,
+      "expenses": [
+        {
+          "expense_id": "E1",
+          "description": "Food for participants",
+          "amount": 100.0,
+          "quote_available": false
+        },
+        {
+          "expense_id": "E2",
+          "description": "Gift vouchers for winners",
+          "amount": 150.0,
+          "quote_available": false
+        }
+      ]
+    },
+    "ai_result": {
+      "event_type": "competition",
+      "event_purpose": "Student technology competition.",
+      "expenses": [
+        {
+          "expense_id": "E1",
+          "category": "food",
+          "purpose": "Participant refreshments.",
+          "ambiguous": false
+        },
+        {
+          "expense_id": "E2",
+          "category": "prize",
+          "purpose": "Competition prizes.",
+          "ambiguous": false
+        }
+      ],
+      "missing_information": []
+    },
+    "existing_records": [
+      {
+        "request_id": "OLD001",
+        "club_name": "Computing Club",
+        "funding_year": 2026,
+        "budget_committed": true,
+        "budget_amount": 850.0
+      }
+    ],
+    "expected": {
+      "status": "REVISION_REQUIRED",
+      "total_requested": 250.0,
+      "estimated_eligible_amount": 150.0,
+      "budget_to_commit": 0.0
+    }
+  },
+  {
+    "name": "Ambiguous expense requires manual review",
+    "request": {
+      "request_id": "TEST004",
+      "club_name": "Computing Club",
+      "event_title": "Student Tech Competition",
+      "event_description": "A student technology competition with refreshments and prizes.",
+      "event_date": "2026-11-20",
+      "submission_date": "2026-11-01",
+      "expected_participants": 40,
+      "funding_year": 2026,
+      "expenses": [
+        {
+          "expense_id": "E1",
+          "description": "Food for participants",
+          "amount": 100.0,
+          "quote_available": false
+        },
+        {
+          "expense_id": "E2",
+          "description": "Gift vouchers for winners",
+          "amount": 150.0,
+          "quote_available": false
+        }
+      ]
+    },
+    "ai_result": {
+      "event_type": "competition",
+      "event_purpose": "Student technology competition.",
+      "expenses": [
+        {
+          "expense_id": "E1",
+          "category": "food",
+          "purpose": "Participant refreshments.",
+          "ambiguous": false
+        },
+        {
+          "expense_id": "E2",
+          "category": "unknown",
+          "purpose": "The purpose of the winner vouchers could not be confirmed.",
+          "ambiguous": true
+        }
+      ],
+      "missing_information": [
+        "Clarification is required for E2."
+      ]
+    },
+    "existing_records": [],
+    "expected": {
+      "status": "MANUAL_REVIEW",
+      "total_requested": 250.0,
+      "estimated_eligible_amount": 250.0,
+      "budget_to_commit": 0.0
+    }
+  },
+  {
+    "name": "Ineligible expense category",
+    "request": {
+      "request_id": "TEST005",
+      "club_name": "Computing Club",
+      "event_title": "Student Tech Competition",
+      "event_description": "A student technology competition with refreshments and prizes.",
+      "event_date": "2026-11-20",
+      "submission_date": "2026-11-01",
+      "expected_participants": 40,
+      "funding_year": 2026,
+      "expenses": [
+        {
+          "expense_id": "E1",
+          "description": "Food for participants",
+          "amount": 100.0,
+          "quote_available": false
+        },
+        {
+          "expense_id": "E2",
+          "description": "Venue decorations",
+          "amount": 150.0,
+          "quote_available": false
+        }
+      ]
+    },
+    "ai_result": {
+      "event_type": "competition",
+      "event_purpose": "Student technology competition.",
+      "expenses": [
+        {
+          "expense_id": "E1",
+          "category": "food",
+          "purpose": "Participant refreshments.",
+          "ambiguous": false
+        },
+        {
+          "expense_id": "E2",
+          "category": "decoration",
+          "purpose": "Venue decoration.",
+          "ambiguous": false
+        }
+      ],
+      "missing_information": []
+    },
+    "existing_records": [],
+    "expected": {
+      "status": "REVISION_REQUIRED",
+      "total_requested": 250.0,
+      "estimated_eligible_amount": 100.0,
+      "budget_to_commit": 0.0
+    }
+  }
+]

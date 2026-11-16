@@ -1,0 +1,11 @@
+{
+  "max_request_amount": 1200.0,
+  "minimum_lead_days": 14,
+  "food_per_person_limit": 5.0,
+  "max_prize_amount": 200.0,
+  "equipment_quote_threshold": 300.0,
+  "ineligible_categories": [
+    "decoration"
+  ],
+  "disabled_rules": []
+}

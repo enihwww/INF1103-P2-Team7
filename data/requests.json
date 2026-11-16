@@ -1,0 +1,266 @@
+[
+  {
+    "request_id": "CF0001",
+    "club_name": "Computing Club",
+    "event_title": "hackathon",
+    "event_description": "hackathon",
+    "event_date": "2026-10-28",
+    "submission_date": "2026-09-28",
+    "expected_participants": 30,
+    "expenses": [
+      {
+        "expense_id": "E1",
+        "description": "speaker",
+        "amount": 100.0,
+        "quote_available": false
+      }
+    ],
+    "funding_year": 2026,
+    "ai_result": null,
+    "assessment": null,
+    "processing_status": "AI_FAILED",
+    "processing_error": "AI processing failed after 3 attempts: Missing credentials. Please pass an `api_key`, `workload_identity`, `admin_api_key`, or set the `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY` environment variable.",
+    "budget_committed": false,
+    "budget_amount": 0.0
+  },
+  {
+    "request_id": "CF0002",
+    "club_name": "Photography Club",
+    "event_title": "Photography Competition",
+    "event_description": "Internal competition",
+    "event_date": "2026-12-01",
+    "submission_date": "2026-10-06",
+    "expected_participants": 20,
+    "expenses": [
+      {
+        "expense_id": "E1",
+        "description": "Camera",
+        "amount": 100.0,
+        "quote_available": false
+      }
+    ],
+    "funding_year": 2026,
+    "ai_result": {
+      "event_type": "unknown",
+      "event_purpose": "Not classified because AI service was unavailable.",
+      "expenses": [
+        {
+          "expense_id": "E1",
+          "category": "unknown",
+          "purpose": "Not classified because AI service was unavailable.",
+          "ambiguous": true
+        }
+      ],
+      "missing_information": [
+        "AI classification unavailable. Manual review is required."
+      ]
+    },
+    "assessment": {
+      "status": "MANUAL_REVIEW",
+      "funding_year": 2026,
+      "annual_budget": 1000.0,
+      "used_budget_before": 0.0,
+      "remaining_budget_before": 1000.0,
+      "total_requested": 100.0,
+      "estimated_eligible_amount": 100.0,
+      "budget_to_commit": 0.0,
+      "remaining_budget_after": 1000.0,
+      "lead_days": 56,
+      "checks": [
+        {
+          "result": "PASS",
+          "message": "Request is within the single-request limit."
+        },
+        {
+          "result": "PASS",
+          "message": "$1000.00 is available before this request."
+        },
+        {
+          "result": "PASS",
+          "message": "56 day(s) of lead time."
+        },
+        {
+          "result": "REVIEW",
+          "message": "Event type needs human review."
+        },
+        {
+          "result": "REVIEW",
+          "message": "Some request information is missing."
+        },
+        {
+          "result": "REVIEW",
+          "message": "E1 needs human review."
+        }
+      ],
+      "issues": [
+        "Event type could not be classified.",
+        "Missing information: AI classification unavailable. Manual review is required.",
+        "E1 could not be classified clearly."
+      ]
+    },
+    "processing_status": "AI_FAILED",
+    "processing_error": "AI processing failed after 3 attempts: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}",
+    "budget_committed": false,
+    "budget_amount": 0.0
+  },
+  {
+    "request_id": "CF0003",
+    "club_name": "Sports Club",
+    "event_title": "Competition",
+    "event_description": "interschool",
+    "event_date": "2026-12-01",
+    "submission_date": "2026-09-10",
+    "expected_participants": 20,
+    "expenses": [
+      {
+        "expense_id": "E1",
+        "description": "ball",
+        "amount": 10.0,
+        "quote_available": false
+      }
+    ],
+    "funding_year": 2026,
+    "ai_result": {
+      "event_type": "unknown",
+      "event_purpose": "Not classified because AI service was unavailable.",
+      "expenses": [
+        {
+          "expense_id": "E1",
+          "category": "unknown",
+          "purpose": "Not classified because AI service was unavailable.",
+          "ambiguous": true
+        }
+      ],
+      "missing_information": [
+        "AI classification unavailable. Manual review is required."
+      ]
+    },
+    "assessment": {
+      "status": "MANUAL_REVIEW",
+      "funding_year": 2026,
+      "annual_budget": 1000.0,
+      "used_budget_before": 0.0,
+      "remaining_budget_before": 1000.0,
+      "total_requested": 10.0,
+      "estimated_eligible_amount": 10.0,
+      "budget_to_commit": 0.0,
+      "remaining_budget_after": 1000.0,
+      "lead_days": 82,
+      "checks": [
+        {
+          "result": "PASS",
+          "message": "Request is within the single-request limit."
+        },
+        {
+          "result": "PASS",
+          "message": "$1000.00 is available before this request."
+        },
+        {
+          "result": "PASS",
+          "message": "82 day(s) of lead time."
+        },
+        {
+          "result": "REVIEW",
+          "message": "Event type needs human review."
+        },
+        {
+          "result": "REVIEW",
+          "message": "Some request information is missing."
+        },
+        {
+          "result": "REVIEW",
+          "message": "E1 needs human review."
+        }
+      ],
+      "issues": [
+        "Event type could not be classified.",
+        "Missing information: AI classification unavailable. Manual review is required.",
+        "E1 could not be classified clearly."
+      ]
+    },
+    "processing_status": "AI_FAILED",
+    "processing_error": "AI processing failed after 3 attempts: Missing credentials. Please pass an `api_key`, `workload_identity`, `admin_api_key`, or set the `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY` environment variable.",
+    "budget_committed": false,
+    "budget_amount": 0.0
+  },
+  {
+    "request_id": "CF0004",
+    "club_name": "Computing Club",
+    "event_title": "test",
+    "event_description": "test",
+    "event_date": "2026-12-01",
+    "submission_date": "2026-10-09",
+    "expected_participants": 10,
+    "expenses": [
+      {
+        "expense_id": "E1",
+        "description": "test",
+        "amount": 10.0,
+        "quote_available": false
+      }
+    ],
+    "funding_year": 2026,
+    "ai_result": {
+      "event_type": "unknown",
+      "event_purpose": "Not classified because AI service was unavailable.",
+      "expenses": [
+        {
+          "expense_id": "E1",
+          "category": "unknown",
+          "purpose": "Not classified because AI service was unavailable.",
+          "ambiguous": true
+        }
+      ],
+      "missing_information": [
+        "AI classification unavailable. Manual review is required."
+      ]
+    },
+    "assessment": {
+      "status": "MANUAL_REVIEW",
+      "funding_year": 2026,
+      "annual_budget": 1000.0,
+      "used_budget_before": 0.0,
+      "remaining_budget_before": 1000.0,
+      "total_requested": 10.0,
+      "estimated_eligible_amount": 10.0,
+      "budget_to_commit": 0.0,
+      "remaining_budget_after": 1000.0,
+      "lead_days": 53,
+      "checks": [
+        {
+          "result": "PASS",
+          "message": "Request is within the single-request limit."
+        },
+        {
+          "result": "PASS",
+          "message": "$1000.00 is available before this request."
+        },
+        {
+          "result": "PASS",
+          "message": "53 day(s) of lead time."
+        },
+        {
+          "result": "REVIEW",
+          "message": "Event type needs human review."
+        },
+        {
+          "result": "REVIEW",
+          "message": "Some request information is missing."
+        },
+        {
+          "result": "REVIEW",
+          "message": "E1 needs human review."
+        }
+      ],
+      "issues": [
+        "Event type could not be classified.",
+        "Missing information: AI classification unavailable. Manual review is required.",
+        "E1 could not be classified clearly."
+      ]
+    },
+    "processing_status": "AI_FAILED",
+    "processing_error": "AI processing failed after 3 attempts: Missing credentials. Please pass an `api_key`, `workload_identity`, `admin_api_key`, or set the `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY` environment variable.",
+    "budget_committed": false,
+    "budget_amount": 0.0
+  }
+]
