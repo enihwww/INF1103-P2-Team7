@@ -1,4 +1,4 @@
-# ClubFund – Phase 2 (INF1103 Team 7)
+# ClubFund – Phase 2 (INF1103 P2 Team 7)
 
 AI-assisted pre-screening of student club funding requests. Phase 2 refactors the Phase 1
 program into classes, adds an admin **funding policy editor** (new feature) and a
