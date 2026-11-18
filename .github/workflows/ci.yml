@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r req.txt
+      - name: Run automated tests (no live AI API needed)
+        run: python -m unittest -v
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t clubfund .
+      - name: Run tests inside the container
+        run: docker run --rm clubfund python -m unittest -v
